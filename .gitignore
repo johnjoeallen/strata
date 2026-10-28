@@ -15,3 +15,4 @@ __pycache__/
 /bench/c/brc
 /bench/c/conc_alloc
 /bench/c/promote_stress
+site/

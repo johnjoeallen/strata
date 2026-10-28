@@ -1,0 +1,42 @@
+site_name: Strata
+site_description: Designing a Rust alternative with Goose-style arenas, one measured step at a time
+site_url: https://johnjoeallen.github.io/strata/
+repo_url: https://github.com/johnjoeallen/strata
+repo_name: johnjoeallen/strata
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: { icon: material/weather-night, name: Dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: { icon: material/weather-sunny, name: Light mode }
+extra:
+  version:
+    provider: mike
+    default: latest
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - tables
+  - toc: { permalink: true }
+nav:
+  - Home: index.md
+  - The journey:
+      - journey/index.md
+      - 1. Why Strata: journey/01-why.md
+      - 2. Measuring the foundations: journey/02-foundations.md
+      - 3. An HTTP server: journey/03-http.md
+      - 4. Against Rust and Go: journey/04-comparison.md
+      - 5. mini-redis: journey/05-mini-redis.md
+      - 6. Locks that park: journey/06-locks.md
+  - Decisions: decisions.md
+  - Open questions: open-questions.md
+  - Repository map: repo-map.md
