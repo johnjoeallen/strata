@@ -1,0 +1,32 @@
+## fill 2000000
+config: slab work=fill n=2000000 pattern=random
+fill: alloc+touch 4.3 ns/op, free (random order) 4.8 ns/op, corrupt=0
+  full           rss=   124.0 MB  live=   122.1 MB  ratio= 1.02
+  after free all rss=   124.0 MB  live=     0.0 MB  ratio= 0.00
+## churn 2000000
+config: slab work=churn n=2000000 pattern=random
+churn: 12.4 ns per free+alloc pair
+  after churn    rss=   123.1 MB  live=   122.1 MB  ratio= 1.01
+## mixed 2000000
+config: slab work=mixed n=2000000 pattern=random
+mixed: 3.5 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   135.3 MB  live=   134.3 MB  ratio= 1.01
+  after burst    rss=   135.3 MB  live=    12.2 MB  ratio=11.06
+## ramp 2000000 random
+config: slab work=ramp n=2000000 pattern=random
+ramp(random): live after free=200000 (10%)
+  full           rss=   124.1 MB  live=   122.1 MB  ratio= 1.02
+  after free 90% rss=   124.1 MB  live=    12.2 MB  ratio=10.17
+  after refill   rss=   124.1 MB  live=    73.2 MB  ratio= 1.70
+## ramp 2000000 fifo
+config: slab work=ramp n=2000000 pattern=fifo
+ramp(fifo): live after free=200000 (10%)
+  full           rss=   122.4 MB  live=   122.1 MB  ratio= 1.00
+  after free 90% rss=   122.4 MB  live=    12.2 MB  ratio=10.03
+  after refill   rss=   122.4 MB  live=    73.2 MB  ratio= 1.67
+## ramp 2000000 group
+config: slab work=ramp n=2000000 pattern=group
+ramp(group): live after free=200000 (10%)
+  full           rss=   123.1 MB  live=   122.1 MB  ratio= 1.01
+  after free 90% rss=   123.1 MB  live=    12.2 MB  ratio=10.09
+  after refill   rss=   123.1 MB  live=    73.2 MB  ratio= 1.68

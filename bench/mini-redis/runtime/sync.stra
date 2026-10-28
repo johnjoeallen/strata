@@ -1,0 +1,53 @@
+// runtime/sync.stra - NEW runtime support for mini-redis: wait sources and cross-worker mailboxes. The HTTP server never needed these: its
+// vthreads only waited on their own socket and their own children. Everything here is callable from ANY worker and none of it parks except
+// where `parks` is written. The rest of the runtime (sockets, timers, scheduler) is ../c/http/runtime/leaves.stra, unchanged.
+// C counterpart (to write): runtime/rt_sync.h. A wake from another worker goes through that worker's wake queue (an eventfd the worker's
+// epoll already watches), so the woken vthread resumes on ITS worker, in that worker's turn; nothing migrates.
+import runtime.leaves
+
+// Signal, Flag and Limiter are HANDLES to a shared runtime object: copying one shares the object (atomic count), so a worker closure or the
+// signal handler can capture them. Mailbox is created as a Ref, for the same reason.
+
+// A wait source that becomes ready at a point in time (a Wakeup for waitAny). The timer is cancellable: if another source wins, the timer is removed.
+extern impl Wakeup {
+    static fn at(when: Instant): Wakeup
+}
+
+// Auto-reset signal (a "permit"): notify() before a wait is remembered, so a wake is never lost between a check and a wait. One waiter at a time.
+extern struct Signal {
+    static fn make(): Signal
+    fn notify()                                          // any worker; never parks
+    fn wakeup(): Wakeup                                  // ready when a permit exists; waitAny consumes it when it returns this source
+}
+
+// Sticky flag: once set it stays set and every waiter, now or later, is woken. Used for server shutdown.
+extern struct Flag {
+    static fn make(): Flag
+    fn set()                                             // any worker; never parks; idempotent
+    fn isSet(): bool
+    fn wakeup(): Wakeup                                  // ready for every waiter once set
+}
+
+// A bounded queue with one consumer vthread and any number of producers on any worker. `capacity` is stated by the creator (principle 11).
+// A full queue REFUSES the message and counts it; nothing is dropped silently and nothing is dropped from the middle: the producer is
+// told (tryPush returns false) and the consumer is told how many it missed (takeLost).
+extern struct Mailbox<T> {
+    static fn make(capacity: usize): Ref<Mailbox<T>>
+    fn tryPush(msg: T): bool                             // never parks. false: full; the message is NOT queued and the lost count goes up
+    fn tryPop(): T?                                      // consumer only; never parks
+    fn takeLost(): u64                                   // consumer only: messages refused since the last call, and resets the count
+    fn wakeup(): Wakeup                                  // ready when the queue is not empty
+}
+
+// Counting limit on live things (connections). tryAcquire refuses instead of parking; the caller says what a refusal means.
+extern struct Limiter {
+    static fn make(limit: usize): Limiter
+    fn tryAcquire(): bool                                // atomic
+    fn release()
+}
+
+// A listener that can be waited on together with something else (the accept loop also waits for shutdown).
+extern impl Listener {
+    fn tryAccept(): Conn? throws IoError                 // never parks. null: no client waiting
+    fn readableWakeup(): Wakeup
+}

@@ -1,0 +1,23 @@
+## pipelined worst case, 1 server worker, 16 active conns, K tiny (18 B) requests per write
+server_16k_eager bufsz=16384 K=800 | rps=464592 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_16k bufsz=16384 K=800 | rps=472792 | cpu_ticks=417 | err connect=0 io=0 partial=0
+server_16k_eager bufsz=16384 K=800 | rps=466192 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_16k bufsz=16384 K=800 | rps=473391 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_16k_eager bufsz=16384 K=800 | rps=466791 | cpu_ticks=417 | err connect=0 io=0 partial=0
+server_16k bufsz=16384 K=800 | rps=467792 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_eager bufsz=2048 K=100 | rps=468117 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server bufsz=2048 K=100 | rps=469492 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_eager bufsz=2048 K=100 | rps=471392 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server bufsz=2048 K=100 | rps=473266 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_eager bufsz=2048 K=100 | rps=461767 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server bufsz=2048 K=100 | rps=468967 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_16k_eager bufsz=16384 K=1 | rps=308660 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_16k bufsz=16384 K=1 | rps=305876 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_16k_eager bufsz=16384 K=1 | rps=308023 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_16k bufsz=16384 K=1 | rps=308759 | cpu_ticks=416 | err connect=0 io=0 partial=0
+server_64k_eager bufsz=65536 K=3500 | rps=416493 | err connect=0 io=0 partial=0
+server_64k bufsz=65536 K=3500 | rps=475116 | err connect=0 io=0 partial=0
+server_64k_eager bufsz=65536 K=3500 | rps=417368 | err connect=0 io=0 partial=0
+server_64k bufsz=65536 K=3500 | rps=471618 | err connect=0 io=0 partial=0
+server_64k_eager bufsz=65536 K=3500 | rps=417368 | err connect=0 io=0 partial=0
+server_64k bufsz=65536 K=3500 | rps=473367 | err connect=0 io=0 partial=0

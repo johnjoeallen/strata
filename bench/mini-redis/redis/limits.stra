@@ -1,0 +1,24 @@
+// redis/limits.stra - every unbounded input of the server has a declared limit (design principle 11). The host passes a Limits value in.
+// The original (orig/src) has none of these: `Vec::with_capacity(len)` takes its size straight from the wire, the read buffer and the
+// database are unbounded, and the pub/sub queue silently drops. C counterpart: the options in server.c main().
+
+const MAX_ARGS: usize = 64                               // arguments in one command (also the size of Args.items). SUBSCRIBE a b c ... is capped by it
+
+// What the server does when a subscriber's mailbox is full because the client reads too slowly.
+enum LagPolicy {
+    Disconnect               // answer "-ERR subscriber too slow; N messages lost" and close the connection
+    Notice                   // keep the connection; send ["lagged", N] before the next message
+}
+
+struct Limits {
+    maxConns: usize = 250            // connections served at once; the next client gets "-ERR max clients" and is closed (the original parks its accept loop instead)
+    maxFrame: usize = 4194304        // one request frame, headers included. The input buffer grows (runtime size classes) up to this and no further
+    maxBulk: usize = 1048576         // one argument. Checked from the length line, BEFORE any of its bytes are read
+    maxKey: usize = 512              // a key or channel name
+    maxKeys: usize = 1000000         // entries in the database; SET of a new key beyond it answers "-ERR max keys"
+    maxExpireSecs: u64 = 315360000   // SET ... EX/PX beyond ten years is refused ("invalid expire time"); it also keeps now + ttl from overflowing
+    maxTopics: usize = 10000        // channels with at least one subscriber
+    maxSubs: usize = 100             // channels one connection can subscribe to
+    subQueue: usize = 1024           // messages a subscriber can have waiting (the original: broadcast::channel(1024))
+    lag: LagPolicy = Disconnect
+}

@@ -1,0 +1,94 @@
+// redis/frame.stra - scans one RESP request frame (an array of simple/bulk/integer elements) into offsets, in a single resumable pass.
+// Original: frame.rs `Frame::check` followed by `Frame::parse` (two passes, every element copied into a heap tree). Here the bytes stay in the
+// reader's buffer and Args holds offsets; only what the database keeps is copied, later.
+// Limits are enforced from the LENGTH LINES, before the bytes they announce are read (principle 11).
+import redis.types
+import redis.limits
+
+const MAX_LINE: usize = 32                               // the longest header or length line ("*64", "$1048576", ":18446744073709551615" with room to spare)
+
+// The scanner's memory between calls, so a frame that arrives in many small pieces is scanned once, not once per piece.
+struct Scanner {
+    pos: usize = 0                                       // bytes of the current frame already understood
+    left: usize = 0                                      // elements still to read
+    started: bool = false
+
+    fn reset() { self.pos = 0; self.left = 0; self.started = false }
+
+    // Continues the scan over `data` (the buffered bytes from the frame's first byte). Fills `args` as elements complete.
+    fn advance(data: u8[]&, args: Args&, lim: Limits&): Scan throws ProtocolError, FrameTooLarge {
+        if (!started) {
+            let line = readLine(data, pos)
+            if (line == null) {
+                if (data.length - pos > MAX_LINE) throw ProtocolError("protocol error; expected array")   // the header line is short
+                return Scan.More(data.length + 1)
+            }
+            if (data[pos] != '*') throw ProtocolError("protocol error; expected array")
+            let n = parseDecimal(data[pos + 1..line.end])
+            if (n == 0) throw ProtocolError("protocol error; empty command")
+            if (n > MAX_ARGS) throw ProtocolError("protocol error; too many arguments")
+            self.left = n
+            self.pos = line.next
+            self.started = true
+            args.count = 0
+        }
+        while (left > 0) {
+            if (pos >= data.length) return Scan.More(pos + 1)
+            let line = readLine(data, pos)
+            if (line == null) {                          // no line end yet: a length line is short, only a simple string can be long
+                let most = data[pos] == '+' ? lim.maxBulk : MAX_LINE
+                if (data.length - pos > most) throw FrameTooLarge()
+                return Scan.More(data.length + 1)
+            }
+            if (data[pos] == '+' && line.end - pos > lim.maxBulk) throw FrameTooLarge()
+            let kind = data[pos]
+            switch (kind) {
+                '+' -> { args.items[args.count] = Arg { kind: ArgKind.Simple, start: pos + 1, end: line.end, number: 0 }
+                         self.pos = line.next }
+                ':' -> { let v = parseDecimal(data[pos + 1..line.end])
+                         args.items[args.count] = Arg { kind: ArgKind.Integer, start: 0, end: 0, number: v }
+                         self.pos = line.next }
+                '$' -> {
+                    if (data[pos + 1..line.end] == "-1") {
+                        args.items[args.count] = Arg { kind: ArgKind.Null, start: 0, end: 0, number: 0 }
+                        self.pos = line.next
+                    } else {
+                        let len = parseDecimal(data[pos + 1..line.end])
+                        if (len > lim.maxBulk) throw FrameTooLarge()                 // refused before a single data byte is read
+                        let total = line.next + len + 2
+                        if (total > lim.maxFrame) throw FrameTooLarge()
+                        if (data.length < total) return Scan.More(total)
+                        if (data[total - 2] != '\r' || data[total - 1] != '\n') throw ProtocolError("protocol error; invalid frame format")
+                        args.items[args.count] = Arg { kind: ArgKind.Bulk, start: line.next, end: line.next + len, number: 0 }
+                        self.pos = total
+                    }
+                }
+                default -> { throw ProtocolError("protocol error; invalid element type") }   // '-', '*' (nested arrays), anything else
+            }
+            args.count += 1
+            self.left -= 1
+        }
+        return Scan.Done(pos)
+    }
+}
+
+// The line starting at `from`: where its text ends and where the next line begins. null: no complete line yet.
+struct Line { end: usize, next: usize }
+fn readLine(data: u8[]&, from: usize): Line? {
+    let i = data[from..].find("\r\n")
+    if (i == null) return null
+    return Line { end: from + i, next: from + i + 2 }
+}
+
+// Digits only, at most u64. (The original uses the `atoi` crate; this is all it is used for.)
+fn parseDecimal(text: u8[]&): u64 throws ProtocolError {
+    if (text.length == 0 || text.length > 20) throw ProtocolError("protocol error; invalid number")
+    var v: u64 = 0
+    for (c in text) {
+        if (c < '0' || c > '9') throw ProtocolError("protocol error; invalid number")
+        let d = (c - '0') as u64
+        if (v > (U64_MAX - d) / 10) throw ProtocolError("protocol error; invalid number")
+        v = v * 10 + d
+    }
+    return v
+}

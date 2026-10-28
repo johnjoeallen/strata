@@ -1,0 +1,39 @@
+## concurrent pipelining: instant handlers, 1 worker, requests/s. K = pipelined requests per write
+sequential (flush each)        conns=16 K=16 | rps=454523 | first_resp_us mean=533 max=1776 | batch_done p50=549 | err connect=0 io=0 partial=0
+sequential + opt-in batching   conns=16 K=16 | rps=4085766 | first_resp_us mean=62 max=580 | batch_done p50=61 | err connect=0 io=0 partial=0
+concurrent, inline fast path   conns=16 K=16 | rps=4207116 | first_resp_us mean=60 max=4663 | batch_done p50=60 | err connect=0 io=0 partial=0
+concurrent, always spawn       conns=16 K=16 | rps=4197475 | first_resp_us mean=60 max=4065 | batch_done p50=59 | err connect=0 io=0 partial=0
+sequential (flush each)        conns=16 K=16 | rps=458805 | first_resp_us mean=528 max=3857 | batch_done p50=544 | err connect=0 io=0 partial=0
+sequential + opt-in batching   conns=16 K=16 | rps=4092294 | first_resp_us mean=62 max=562 | batch_done p50=61 | err connect=0 io=0 partial=0
+concurrent, inline fast path   conns=16 K=16 | rps=4225068 | first_resp_us mean=60 max=449 | batch_done p50=59 | err connect=0 io=0 partial=0
+concurrent, always spawn       conns=16 K=16 | rps=4273233 | first_resp_us mean=59 max=5708 | batch_done p50=59 | err connect=0 io=0 partial=0
+## no pipelining (K=1): does the inline fast path cost anything?
+sequential                     conns=16 K=1 | rps=306890 | first_resp_us mean=0 max=0 | batch_done p50=50 | err connect=0 io=0 partial=0
+concurrent, inline fast path   conns=16 K=1 | rps=298294 | first_resp_us mean=0 max=0 | batch_done p50=52 | err connect=0 io=0 partial=0
+concurrent, always spawn       conns=16 K=1 | rps=293792 | first_resp_us mean=0 max=0 | batch_done p50=53 | err connect=0 io=0 partial=0
+sequential                     conns=16 K=1 | rps=306420 | first_resp_us mean=0 max=0 | batch_done p50=50 | err connect=0 io=0 partial=0
+concurrent, inline fast path   conns=16 K=1 | rps=305259 | first_resp_us mean=0 max=0 | batch_done p50=50 | err connect=0 io=0 partial=0
+concurrent, always spawn       conns=16 K=1 | rps=294258 | first_resp_us mean=0 max=0 | batch_done p50=53 | err connect=0 io=0 partial=0
+## parking handlers: every handler waits 200 us on a timer (stands in for a DB call). 1 worker. K=16 pipelined
+sequential                     conns=1 K=16 | rps=3904 | first_resp_us mean=269 max=4184 | batch_done p50=4084 | err connect=0 io=0 partial=0
+concurrent, depth=16           conns=1 K=16 | rps=59828 | first_resp_us mean=267 max=4543 | batch_done p50=265 | err connect=0 io=0 partial=0
+concurrent, depth=4            conns=1 K=16 | rps=15504 | first_resp_us mean=266 max=2188 | batch_done p50=1029 | err connect=0 io=0 partial=0
+sequential                     conns=16 K=16 | rps=62249 | first_resp_us mean=287 max=505 | batch_done p50=4111 | err connect=0 io=0 partial=0
+concurrent, depth=16           conns=16 K=16 | rps=807787 | first_resp_us mean=316 max=1639 | batch_done p50=318 | err connect=0 io=0 partial=0
+concurrent, depth=4            conns=16 K=16 | rps=213541 | first_resp_us mean=316 max=4291 | batch_done p50=1201 | err connect=0 io=0 partial=0
+## same, no pipelining (K=1): concurrency across connections already exists in both
+sequential                     conns=16 K=1 | rps=53203 | first_resp_us mean=0 max=0 | batch_done p50=300 | err connect=0 io=0 partial=0
+concurrent                     conns=16 K=1 | rps=53182 | first_resp_us mean=0 max=0 | batch_done p50=302 | err connect=0 io=0 partial=0
+## one slow CPU request (~1 ms, GET /slow) at position 9 of 16, instant handlers otherwise, 1 unloaded connection
+server_seq                                 | first_resp_us mean=12 max=42 | batch_done p50=944
+server_b16 classify=0                      | first_resp_us mean=955 max=3394 | batch_done p50=916
+server_b16 classify=1                      | first_resp_us mean=10 max=104 | batch_done p50=919
+server conc=1 depth=16 classify=1          | first_resp_us mean=963 max=4665 | batch_done p50=916
+concurrent, slow route declared unbounded (classify=0) | first_resp_us mean=957 max=1270 | batch_done p50=916
+concurrent, slow route declared unbounded (classify=1) | first_resp_us mean=10 max=129 | batch_done p50=920
+-- server conc=0
+N=100000 srcips=9 | server_rss_delta=8 MB (88 B/conn) | client_rss=4 MB | system_delta=784 MB | kernel_est=4044 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3892060 rps=1297320 | lat_us p50=41 p90=71 p99=85 p999=108 max=4027 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=737 MB
+-- server conc=1
+N=100000 srcips=9 | server_rss_delta=14 MB (153 B/conn) | client_rss=4 MB | system_delta=650 MB | kernel_est=3309 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3836456 rps=1278793 | lat_us p50=51 p90=65 p99=79 p999=95 max=304 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=642 MB

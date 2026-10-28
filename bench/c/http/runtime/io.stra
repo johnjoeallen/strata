@@ -1,0 +1,12 @@
+// runtime/io.stra - sending. C counterpart: runtime/rt_io.h (write_all_step, WriteAll).
+import runtime.leaves
+
+// ---------- sending ----------
+// Sends all of `bytes`. A short send leaves the rest in the frame while the vthread waits for space.
+fn writeAll(conn: Conn&, bytes: u8[]&) throws IoError {
+    var rest = bytes
+    while (rest.length > 0) {
+        let n = conn.send(rest)   // EAGAIN: park until writable
+        rest = rest[n..]
+    }
+}

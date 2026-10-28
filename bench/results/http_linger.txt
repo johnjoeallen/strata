@@ -1,0 +1,27 @@
+## close-per-request workload (ab, HTTP/1.0, no keep-alive, 64 connections, 150,000 requests; 1 worker)
+conc=1 linger=0      | 63830.49 req/s | failed=0 | server cpu ticks=150 | fds after: 5
+conc=1 linger=2000   | 61356.95 req/s | failed=0 | server cpu ticks=178 | fds after: 5
+conc=0 linger=0      | 64370.44 req/s | failed=0 | server cpu ticks=148 | fds after: 5
+conc=0 linger=2000   | 61225.46 req/s | failed=0 | server cpu ticks=180 | fds after: 5
+conc=1 linger=0      | 63271.14 req/s | failed=0 | server cpu ticks=150 | fds after: 5
+conc=1 linger=2000   | 60327.36 req/s | failed=0 | server cpu ticks=179 | fds after: 5
+conc=0 linger=0      | 62570.34 req/s | failed=0 | server cpu ticks=148 | fds after: 5
+conc=0 linger=2000   | 60559.55 req/s | failed=0 | server cpu ticks=180 | fds after: 5
+conc=1 linger=0      | 62418.47 req/s | failed=0 | server cpu ticks=149 | fds after: 5
+conc=1 linger=2000   | 58977.54 req/s | failed=0 | server cpu ticks=181 | fds after: 5
+conc=0 linger=0      | 62029.58 req/s | failed=0 | server cpu ticks=149 | fds after: 5
+conc=0 linger=2000   | 60695.84 req/s | failed=0 | server cpu ticks=180 | fds after: 5
+## close-per-request (ab, HTTP/1.0 no keep-alive) AFTER the policy change: nothing is left to read, so no lingering
+conc=1 linger=0      | 64605.58 req/s | failed=0 | server cpu ticks=145
+conc=1 linger=2000   | 63089.12 req/s | failed=0 | server cpu ticks=150
+conc=1 linger=0      | 65978.38 req/s | failed=0 | server cpu ticks=143
+conc=1 linger=2000   | 63960.57 req/s | failed=0 | server cpu ticks=148
+conc=1 linger=0      | 63943.33 req/s | failed=0 | server cpu ticks=146
+conc=1 linger=2000   | 64247.09 req/s | failed=0 | server cpu ticks=147
+## after lingering close and cancellable timers (1 worker, 16 conns)
+concurrent, always spawn, K=16     | rps=4127609 | first_resp_us mean=61 max=2494
+concurrent, always spawn, K=16     | rps=4110481 | first_resp_us mean=62 max=3427
+concurrent, always spawn, K=16     | rps=4210856 | first_resp_us mean=60 max=1135
+concurrent inline, K=1              | rps=301322 | first_resp_us mean=0 max=0
+parking 200 us, K=16, 16 conns       | rps=799769 | first_resp_us mean=320 max=3468
+parking 200 us, K=16, 1 conn         | rps=59929 | first_resp_us mean=266 max=4136

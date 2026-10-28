@@ -1,0 +1,149 @@
+// http/reader.stra - the connection's input reader: owns the buffer and any leftovers, finds request heads, and drives the body readers.
+// C counterpart: http/http_reader.h (read_request_step), runtime/rt_buf.h (size classes) and the admission loop of conc_step (server.c).
+import runtime.leaves
+import http.types
+import http.config
+import http.body
+
+// ---------- the connection's input reader (library type: owns the buffer and the leftovers) ----------
+// Unconsumed input is buf[start..end]. A finished request is consumed by advancing `start` (no copy). Bytes are
+// compacted to the front only when the tail is full and more input is needed, so cost is amortised O(1) per byte
+// even when a client pipelines many tiny requests. The buffer comes from the worker's pool only while there is
+// unconsumed input, so an idle connection owns none; it goes back to the pool when the input is fully consumed
+// and when the Reader is dropped.
+struct Reader {
+    conn: Conn&
+    buf: u8[]? = null                                        // a runtime growable array; unallocated while the connection is idle
+    maxHead: usize                                           // the largest header block accepted
+    yieldBytes: usize                                        // body bytes processed per turn before yielding
+    uploadDir: string
+    start: usize = 0
+    end: usize = 0
+    consumed: usize = 0                                      // end of the request most recently returned
+
+    static fn of(conn: Conn&, cfg: ServerConfig&): Reader {
+        return Reader { conn: conn, maxHead: cfg.maxHead, yieldBytes: cfg.yieldBytes, uploadDir: cfg.uploadDir }
+    }
+
+    // Blocking form: the next complete request head, waiting for input if needed. null: the peer closed cleanly.
+    fn nextRequest(): Request? throws IoError, TooLarge {
+        if (buf == null) {                                   // nothing buffered: wait without holding memory
+            conn.waitReadable()
+            self.buf = u8[]()   // smallest class
+            self.start = 0
+            self.end = 0
+        } else {
+            self.start = consumed                            // the previous request's bytes are now dead
+        }
+        while (true) {
+            let req = findCompleteRequest()
+            if (req != null) return req
+            if (!makeRoom()) throw TooLarge()   // compacts or grows; false at the limit
+            let n = conn.recv(buf[end..buf.capacity])   // EAGAIN: park until readable
+            if (n == 0) return null
+            self.end += n
+        }
+    }
+
+    // Non-parking form for loops that also wait on something else: a request that is already buffered, or one more
+    // non-blocking read. Three outcomes, so it returns an Input, not a nullable.
+    fn tryNextRequest(): Input throws IoError, TooLarge {   // (server.c: step (c) of conc_step)
+        let req = findCompleteRequest()
+        if (req != null) return Input.Head(req)
+        if (buf == null && !conn.readableHint()) return Input.Idle                                 // idle: allocate nothing
+        if (buf == null) { self.buf = u8[](); self.start = 0; self.end = 0 }
+        if (!makeRoom()) throw TooLarge()
+        let n = conn.tryRecv(buf[end..buf.capacity])   // never parks
+        if (n == null) return Input.Idle                     // nothing to read right now
+        if (n == 0) return Input.Closed                      // EOF is a state here, not an error: in-flight work still finishes
+        self.end += n
+        return tryNextRequest()
+    }
+
+    fn head(req: Request&): u8[]& { return buf[req.start..req.end] }   // resolved against the buffer's current address
+    fn consume(req: Request&) { self.start = req.end }   // advance, no copy
+    fn releaseIfDrained() { if (start == end) self.buf = null }   // dropping the array returns it to its pool
+
+    // The next complete request head in buf[start..end], if one is there. Does not read from the socket.
+    fn findCompleteRequest(): Request? {
+        if (buf == null || end <= start) return null
+        let i = buf[start..end].find("\r\n\r\n")   // null: not there yet
+        if (i == null) return null
+        self.consumed = start + i + 4
+        return Request { start: start, end: consumed }
+    }
+
+    // Is another complete request already buffered after the one just consumed? (Does not move any cursor.)
+    fn hasCompleteRequest(): bool {
+        if (buf == null || end <= start) return false
+        return buf[start..end].contains("\r\n\r\n")
+    }
+
+    // Free space at the tail for the next read. true: there is room. false: the buffer is full of ONE unfinished header block and
+    // is already at maxHead. Three cases: room at the tail; compact (the unconsumed bytes slide to the front); grow to the next
+    // size class (the runtime copies the bytes). Offsets stay valid in all three.
+    fn makeRoom(): bool {
+        if (end < buf.capacity) return true
+        if (start > 0) {
+            buf.moveWithin(start..end, 0)
+            self.end -= start
+            self.start = 0
+            return true
+        }
+        if (buf.capacity >= maxHead) return false
+        buf.grow()
+        return true
+    }
+
+    // The STANDARD reader: the whole body, in memory, at most `limit` (the caller passes ServerConfig.maxBody).
+    fn readBody(head: u8[]&, limit: u64): Body throws IoError, BadBody, PayloadTooLarge {
+        var sink = Sink.Memory(u8[]())
+        let decoder = streamBody(head, limit, sink)
+        switch (sink) {
+            Memory(data) -> { return Body { data: data, digest: decoder.digest.value() } }
+            Spool(_)     -> { throw BadBody() }                                                    // cannot happen
+        }
+    }
+
+    // The UPLOAD reader: the body goes to an unnamed temporary file as it arrives; `limit` is the route's (never above ServerConfig.uploadMax).
+    fn readUpload(head: u8[]&, limit: u64): Upload throws IoError, BadBody, PayloadTooLarge {
+        var sink = Sink.Spool(null)
+        let decoder = streamBody(head, limit, sink)
+        switch (sink) {
+            Spool(f)  -> { return Upload { spool: (f == null) ? File.openTemp(uploadDir) : f, length: decoder.total, digest: decoder.digest.value() } }
+            Memory(_) -> { throw BadBody() }                                                       // cannot happen
+        }
+    }
+
+    // The engine both readers share. Bytes the connection already buffered are used first; whatever follows the body (a pipelined request) stays
+    // in the buffer. Parks while the client sends, and YIELDS every `yieldBytes` of body so one big body cannot starve the other connections
+    // on this worker (server.c: yield=). On an exception the rest of the body is unread, so the caller must close the connection. `head` is
+    // read only before the buffer moves.
+    fn streamBody(head: u8[]&, limit: u64, sink: Sink&): BodyDecoder throws IoError, BadBody, PayloadTooLarge {
+        let framing = Framing.parse(head)
+        switch (framing) {
+            NoBody -> { throw BadBody() }                                      // a route with a body reader needs a body
+            Fixed(n) -> { if (n > limit) throw PayloadTooLarge() }             // refused before a single body byte is read
+            Chunked(_) -> {}
+        }
+        if (start == end && headExpects100Continue(head)) conn.trySend("HTTP/1.1 100 Continue\r\n\r\n")   // best effort; the client is waiting
+        var decoder = BodyDecoder.of(framing, limit)
+        var budget = yieldBytes
+        while (buf.capacity < 8192) buf.grow()   // stream through a bigger buffer
+        while (!decoder.done) {
+            if (start == end) {
+                let n = conn.recv(buf[0..buf.capacity])   // parks while the client sends
+                if (n == 0) throw IoError()                                    // the client closed in the middle of the body
+                self.start = 0
+                self.end = n
+            }
+            let used = decoder.feed(buf[start..end], sink, uploadDir)   // may throw BadBody / PayloadTooLarge
+            self.start += used
+            budget = (used >= budget) ? 0 : budget - used
+            if (budget == 0) { yield(); budget = yieldBytes }   // back of the run queue
+        }
+        return decoder
+    }
+
+    fn readable(): Wakeup { return conn.readableWakeup() }   // wait source for waitAny
+}

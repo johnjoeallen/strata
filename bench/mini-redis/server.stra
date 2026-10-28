@@ -1,0 +1,210 @@
+// server.stra - the mini-redis server itself: the accept loop, the per-connection command loop, the subscribe loop, shutdown, main.
+// Everything else is in runtime/ and redis/. Original: server.rs, shutdown.rs, cmd/*.rs `apply`, cmd/subscribe.rs `apply`.
+// C counterpart (to write): server.c.
+import runtime.leaves
+import runtime.sync
+import redis.types
+import redis.limits
+import redis.connection
+import redis.reply
+import redis.command
+import redis.db
+
+const PER_TURN: usize = 64                               // commands one connection runs, or messages it delivers, before it yields; stated, not tuned
+
+// ---------- accept loop and shutdown ----------
+// Connections are children of one scope. Leaving the scope (when `shutdown` is set) waits for every child, and each child leaves its loop
+// when it sees the flag: that is the whole of the original's Shutdown + broadcast + mpsc "completion" + Semaphore dance.
+fn serve(listener: Listener&, db: Db&, lim: Limits&, shutdown: Flag&, live: Limiter&) {
+    scope {
+        var backoff = 1
+        while (!shutdown.isSet()) {
+            var conn: Conn? = null
+            try {
+                conn = listener.tryAccept()
+            } catch (e: IoError) {
+                if (backoff > 64) { log(e); shutdown.set(); break }   // as the original: a listener that keeps failing stops the server
+                sleep(Duration.seconds(backoff)); backoff *= 2     // as the original: 1, 2, 4 ... 64 s, then give up
+                continue
+            }
+            if (conn == null) { waitAny(listener.readableWakeup(), shutdown.wakeup()); continue }
+            backoff = 1
+            if (!live.tryAcquire()) { refuse(conn); continue }      // the original parks the accept loop here; this refuses, visibly
+            spawn runConnection(conn, db, lim, shutdown, live)
+        }
+    }
+}
+
+fn refuse(conn: Conn) {
+    conn.trySend("-ERR max clients\r\n")
+    conn.lingerClose(Duration.millis(100), 4096)
+}
+
+// ---------- one connection ----------
+// A vthread's root: handles its own errors, so it declares no `throws`.
+fn runConnection(conn: Conn, db: Db&, lim: Limits&, shutdown: Flag&, live: Limiter&) {
+    var reader = Reader.of(conn, lim)
+    var writer = Writer.of(conn)
+    try {
+        commandLoop(reader, writer, db, lim, shutdown)
+    } catch (e: ProtocolError) {
+        sendError(writer, "ERR " + e.message)
+        conn.lingerClose(Duration.millis(100), 4096)         // the client may still be sending; do not reset its read of the error
+    } catch (e: FrameTooLarge) {
+        sendError(writer, "ERR frame too large")
+        conn.lingerClose(Duration.millis(100), 4096)
+    } catch (e: IoError) {
+        log(e)
+    }
+    live.release()
+}
+
+// Best effort: the connection is being closed anyway, so a failed send is not worth reporting.
+fn sendError(writer: Writer&, text: string) {
+    try { writer.error(text); writer.flush() } catch (e: IoError) { }
+}
+
+fn commandLoop(reader: Reader&, writer: Writer&, db: Db&, lim: Limits&, shutdown: Flag&) throws IoError, ProtocolError, FrameTooLarge {
+    var burst = 0
+    while (!shutdown.isSet()) {
+        let input = reader.tryNextFrame()
+        switch (input) {
+            Closed -> { return }
+            Idle -> { waitAny(reader.readable(), shutdown.wakeup()) }          // original: select! { read_frame, shutdown.recv }
+            Frame -> {
+                let cmd = Command.parse(reader, lim)
+                switch (cmd) {
+                    Get(key) -> {
+                        let v = db.get(key)                                   // the lock is already released here
+                        if (v == null) writer.nullBulk() else writer.bulk(v.bytes)
+                        writer.flush()
+                    }
+                    Set(key, value, expire) -> {
+                        try {
+                            db.set(key, value, expire)
+                            writer.simple("OK")
+                        } catch (e: StoreFull) { writer.error(e.message) }    // refused, the connection stays
+                        writer.flush()
+                    }
+                    Publish(channel, message) -> {
+                        writer.integer(db.publish(channel, message) as u64)
+                        writer.flush()
+                    }
+                    Ping(message) -> {
+                        if (message == null) writer.simple("PONG") else writer.bulk(message)
+                        writer.flush()
+                    }
+                    Subscribe(first) -> { subscribeLoop(reader, writer, db, lim, shutdown, first); return }
+                    Unsubscribe(_)  -> { writer.error("ERR `Unsubscribe` is unsupported in this context"); writer.flush() }
+                    Unknown(name)   -> { writer.error("ERR unknown command '" + name.toString() + "'"); writer.flush() }
+                }
+                reader.finish()
+                burst += 1
+                if (burst == PER_TURN) { burst = 0; yield() }                  // a pipelining client cannot starve the worker, or the subscribers on it
+            }
+        }
+    }
+}
+
+// ---------- subscribed mode ----------
+// Waits on three sources at once: the socket (SUBSCRIBE/UNSUBSCRIBE), the connection's mailbox (messages) and shutdown.
+// Original: StreamMap of per-channel streams + select!. Here one mailbox per connection carries every channel's messages, in publish order.
+struct Subscriptions {
+    names: Bytes[] = []
+    mailbox: Ref<Mailbox<Message>>
+    db: Db&
+
+    // Runs when the loop ends by any route (return, exception). It never parks, so it cannot take the database lock (entering one parks):
+    // it hands each remaining subscription to the reaper queue, and the purge vthread unsubscribes it.
+    fn cleanup() { for (n in names) db.release(n, mailbox) }
+}
+
+fn subscribeLoop(reader: Reader&, writer: Writer&, db: Db&, lim: Limits&, shutdown: Flag&, first: usize) throws IoError, ProtocolError, FrameTooLarge {
+    var subs = Subscriptions { mailbox: Mailbox<Message>.make(lim.subQueue), db: db }
+    addChannels(reader, writer, subs, lim, first)
+    reader.finish()
+    while (!shutdown.isSet()) {
+        var sent = 0
+        while (sent < PER_TURN) {                                            // bounded, then yield: one busy channel cannot starve the worker
+            let m = subs.mailbox.tryPop()
+            if (m == null) break
+            writer.arrayHeader(3); writer.bulk("message"); writer.bulk(m.channel.bytes); writer.bulk(m.data.bytes); writer.flush()
+            sent += 1
+        }
+        let lost = subs.mailbox.takeLost()
+        if (lost > 0) {
+            switch (lim.lag) {
+                Disconnect -> { writer.error("ERR subscriber too slow; " + lost.toString() + " messages lost"); writer.flush(); return }
+                Notice     -> { writer.arrayHeader(2); writer.bulk("lagged"); writer.integer(lost); writer.flush() }
+            }
+        }
+        let busy = sent == PER_TURN                                          // more messages may be waiting: yield, but still look at the socket
+        if (busy) yield()
+        let input = reader.tryNextFrame()
+        switch (input) {
+            Closed -> { return }
+            Idle -> { if (!busy) waitAny(reader.readable(), subs.mailbox.wakeup(), shutdown.wakeup()) }
+            Frame -> {
+                let cmd = Command.parse(reader, lim)
+                switch (cmd) {
+                    Subscribe(f)   -> { addChannels(reader, writer, subs, lim, f) }
+                    Unsubscribe(f) -> { dropChannels(reader, writer, subs, f) }
+                    Get(_), Set(_, _, _), Publish(_, _), Ping(_), Unknown(_) -> {
+                        writer.error("ERR unknown command '" + cmd.name() + "'"); writer.flush()   // as the original: Unknown::new(command.get_name())
+                    }
+                }
+                reader.finish()
+            }
+        }
+    }
+}
+
+fn addChannels(reader: Reader&, writer: Writer&, subs: Subscriptions&, lim: Limits&, first: usize) throws IoError {
+    for (i in first..reader.frame().count) {
+        let name = reader.bytes(reader.frame().items[i])
+        try {
+            let again = subs.names.contains(name)                            // subscribing twice changes nothing (the original replaces the stream)
+            if (!again && subs.names.count >= lim.maxSubs) throw StoreFull("ERR max subscriptions")
+            subs.db.subscribe(name, subs.mailbox)
+            if (!again) subs.names.push(Bytes.copyOf(name))
+            replySubscription(writer, "subscribe", name, subs.names.count)
+        } catch (e: StoreFull) { writer.error(e.message); writer.flush() }
+    }
+}
+
+fn dropChannels(reader: Reader&, writer: Writer&, subs: Subscriptions&, first: usize) throws IoError {
+    if (first == reader.frame().count) {                                      // none named: all of them (the original's rule)
+        for (n in subs.names.copy()) removeChannel(writer, subs, n)
+    } else {
+        for (i in first..reader.frame().count) removeChannel(writer, subs, reader.bytes(reader.frame().items[i]))
+    }
+}
+
+fn removeChannel(writer: Writer&, subs: Subscriptions&, name: u8[]&) throws IoError {
+    subs.db.unsubscribe(name, subs.mailbox)
+    subs.names.removeValue(name)
+    replySubscription(writer, "unsubscribe", name, subs.names.count)
+}
+
+fn replySubscription(writer: Writer&, verb: string, name: u8[]&, count: usize) throws IoError {
+    writer.arrayHeader(3); writer.bulk(verb); writer.bulk(name); writer.integer(count as u64); writer.flush()
+}
+
+// ---------- main ----------
+// Options (server.c main): port (default 6379) workers cpu0 maxconns maxframe maxbulk maxkeys maxtopics maxsubs subqueue lag=disconnect|notice
+fn main(args: string[]) {
+    let lim = Limits.fromArgs(args)
+    let port = args.getInt("port", 6379)
+    let db = Db.make(lim)                                                     // Ref<Db>: shared by every worker
+    let shutdown = Flag.make()
+    let live = Limiter.make(lim.maxConns)                                     // one limit for the whole server, not one per worker
+    onSignal(SIGINT, fn() noparks { shutdown.set() })
+    spawnWorkers(args.getInt("workers", 1), fn(w: Worker) {
+        let listener = Listener.bindReusePort(port)
+        scope {
+            if (w.index == 0) spawn db.purgeLoop()                            // one purge vthread, on worker 0
+            serve(listener, db, lim, shutdown, live)                          // returns when shutdown is set and this worker's connections are done
+            if (w.index == 0) db.closed.set()                                 // inside the scope: leaving it waits for purgeLoop, which ends on this flag
+        }
+    })
+}

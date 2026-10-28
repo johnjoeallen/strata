@@ -1,0 +1,157 @@
+// Pseudo-Strata request handlers, hand-classified for the "may park" analysis.
+// Tags on call sites:  /*N*/ cannot park   /*P*/ parks (direct)   /*I:x*/ indirect call resolved to class x
+//                      /*B*/ blocking foreign call (offloaded to blocking pool, parks the caller)
+// Tags on definitions: //@N  or  //@P frame=<bytes live across the longest park>
+// Primitives (stdlib leaves): conn.read/write/accept, connect, pool.acquire, sleep, qget, and lock entry of
+// sync/mutate are P. Everything else in the stdlib (map, string, json, sort) is N.
+
+// ---------- 1. cache + db read path ----------
+fn cache_get(cache: Ref<Cache>, key: i64) -> Option<User> {   //@P frame=40
+    sync(cache) {                                              // lock entry parks if contended  /*P*/
+        return cache.entries.get(key);                         /*N*/
+    }
+}
+fn cache_put(cache: Ref<Cache>, key: i64, u: User) {           //@P frame=56
+    mutate(cache) {                                            /*P*/
+        cache.entries.insert(key, u);                          /*N*/
+    }
+}
+fn parse_id(path: string) -> i64 {                             //@N
+    let seg = path.split_last('/');                            /*N*/
+    return seg.to_i64();                                       /*N*/
+}
+fn render_user(u: User&) -> string {                           //@N
+    let mut b = StringBuilder::new();                          /*N*/
+    b.append("{\"id\":");                                      /*N*/
+    b.append_i64(u.id);                                        /*N*/
+    b.append(",\"name\":");                                    /*N*/
+    b.append_json(u.name);                                     /*N*/
+    b.append("}");                                             /*N*/
+    return b.finish();                                         /*N*/
+}
+fn write_json(conn: Conn&, body: string) {                     //@P frame=48
+    conn.write(HEADER_200_JSON);                               /*P*/
+    conn.write(body);                                          /*P*/
+}
+fn db_query(pool: Ref<Pool>, sql: string, id: i64) -> Row {    //@P frame=120
+    let c = pool.acquire();                                    /*P*/
+    c.send_query(sql, id);                                     /*P*/
+    let r = c.read_row();                                      /*P*/
+    pool.release(c);                                           /*N*/
+    return r;
+}
+fn row_to_user(r: Row&) -> User {                              //@N
+    return User { id: r.i64(0), name: r.str(1) };              /*N*/ /*N*/
+}
+fn handle_get_user(conn: Conn&, req: Request&, env: Env&) {    //@P frame=64
+    let id = parse_id(req.path);                               /*N*/
+    let hit = cache_get(env.users, id);                        /*P*/
+    if hit.is_some() {
+        write_json(conn, render_user(hit.get()));              /*P*/ /*N*/ /*N*/
+        return;
+    }
+    let row = db_query(env.pool, SQL_USER, id);                /*P*/
+    let user = row_to_user(row);                               /*N*/
+    cache_put(env.users, id, user);                            /*P*/
+    write_json(conn, render_user(user));                       /*P*/ /*N*/
+}
+
+// ---------- 2. streaming proxy ----------
+fn log_event(env: Env&, ev: Event) {                           //@N
+    env.log_ring.try_push(ev);                                 /*N*/  // bounded ring; a separate task drains it
+}
+fn proxy(client: Conn&, addr: Addr, env: Env&) {               //@P frame=4168  // 72 B of state + the 4 KB buf live across every park
+    let up = connect(addr);                                    /*P*/
+    let mut buf = [u8; 4096];
+    loop {
+        let n = client.read(buf);                              /*P*/
+        if n == 0 { break; }
+        up.write_all(buf[..n]);                                /*P*/
+        let m = up.read(buf);                                  /*P*/
+        client.write_all(buf[..m]);                            /*P*/
+        log_event(env, Event::bytes(n, m));                    /*N*/ /*N*/
+    }
+}
+
+// ---------- 3. report: higher-order, mostly compute ----------
+fn handle_report(conn: Conn&, req: Request&, env: Env&) {      //@P frame=88
+    let range = parse_range(req.query);                        /*N*/
+    let rows = load_rows(env.pool, range);                     /*P*/
+    let sorted = sort_by(rows, |a, b| a.ts < b.ts);            /*N*/ /*N*/  // closure is a compile-time value
+    let groups = group_by(sorted, |r| r.region);               /*N*/ /*N*/
+    let out = map(groups, |g| summarize(g));                   /*N*/ /*N*/
+    write_json(conn, render_report(out));                      /*P*/ /*N*/
+}
+fn load_rows(pool: Ref<Pool>, r: Range) -> Row[] {             //@P frame=112
+    let mut rows = Row[];
+    let c = pool.acquire();                                    /*P*/
+    c.send_query(SQL_REPORT, r.from, r.to);                    /*P*/
+    loop {
+        let row = c.read_row();                                /*P*/
+        if row.done() { break; }
+        rows.push(row);                                        /*N*/
+    }
+    pool.release(c);                                           /*N*/
+    return rows;
+}
+fn parse_range(q: string) -> Range { return Range::parse(q); }/*N*/ //@N
+fn summarize(g: Group&) -> Summary { return Summary::of(g); }  /*N*/ //@N
+fn render_report(o: Summary[]) -> string { return json(o); }   /*N*/ //@N
+
+// ---------- 4. routing + middleware through function values ----------
+fn health(conn: Conn&, req: Request&, env: Env&) {             //@N
+    conn.write_nowait(HEADER_200_OK);                          /*N*/  // small response written to a buffered socket
+}
+fn auth(conn: Conn&, req: Request&, env: Env&, next: Handler) {//@P frame=80
+    let tok = req.header("authorization");                     /*N*/
+    let ok = verify_token(env.keys, tok);                      /*P*/  // takes sync(keys)
+    if !ok { write_json(conn, ERR_401); return; }              /*P*/
+    next(conn, req, env);                                      /*I:P*/  // targets: get_user, report, health -> mixed
+}
+fn verify_token(keys: Ref<KeySet>, tok: string) -> bool {      //@P frame=40
+    sync(keys) { return keys.verify(tok); }                    /*P*/ /*N*/
+}
+fn dispatch(conn: Conn&, req: Request&, env: Env&) {           //@P frame=72
+    let h = env.routes.get(req.path);                          /*N*/
+    auth(conn, req, env, h);                                   /*P*/
+}
+
+// ---------- 5. recursive directory walk (parks per node) ----------
+fn walk(dir: Path, env: Env&, acc: Stats&) {                   //@P frame=64
+    let entries = read_dir(dir);                               /*B*/  // blocking syscalls via the blocking pool
+    for e in entries {
+        if e.is_dir() { walk(e.path, env, acc); }              /*P*/  // recursion, one heap frame per level
+        else { acc.add(e.size()); }                            /*N*/ /*N*/
+    }
+}
+
+// ---------- 6. foreign library calls ----------
+fn thumbnail(conn: Conn&, req: Request&, env: Env&) {          //@P frame=96
+    let img = req.body();                                      /*N*/
+    let out = c_resize(img.ptr(), img.len(), 256);             /*B*/  // CPU-bound C library; must not stall the worker
+    write_json(conn, encode_b64(out));                         /*P*/ /*N*/
+}
+fn checksum(buf: Bytes&) -> u32 { return c_crc32(buf.ptr(), buf.len()); }  /*N*/ /*N*/ /*N*/ //@N  // trusted fast leaf
+
+// ---------- 7. pub/sub fan-out ----------
+fn broadcast(subs: Ref<SubList>, msg: Msg) {                   //@P frame=56
+    sync(subs) {                                               /*P*/
+        for s in subs.list.iter() {                            /*N*/
+            s.outbox.try_push(msg.clone());                    /*N*/ /*N*/
+        }
+    }
+}
+fn subscriber(conn: Conn&, env: Env&) {                        //@P frame=64
+    loop {
+        let m = env.bus.qget();                                /*P*/
+        conn.write_all(m.bytes());                             /*P*/ /*N*/
+    }
+}
+
+// ---------- 8. rejected by the checker ----------
+// fn bad(cache: Ref<Cache>, pool: Ref<Pool>, k: i64) {
+//     mutate(cache) {
+//         let v = db_query(pool, SQL_USER, k);               // ERROR: parking call while holding lock
+//         cache.entries.insert(k, v);
+//     }
+// }

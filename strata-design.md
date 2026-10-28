@@ -1,0 +1,393 @@
+# Strata — Programming Language Design Specification
+
+**Status:** exploratory design draft (not an implementation or language standard)  
+**Origin:** independent language design informed by Goose’s compiler-managed stacks and virtual-memory techniques, Rust’s ownership guarantees, and virtual-thread runtimes  
+**Primary goal:** memory-safe, high-performance concurrent server programming with a simpler programmer-facing ownership model than Rust.
+
+> Strata is an independent language proposal, not a Goose fork or a Rust dialect. All Strata examples are illustrative and not yet implemented. Its compiler and runtime may reuse ideas or components from other projects where technically and legally appropriate.
+
+## 1. Motivation
+
+Goose offers a compelling model: compiler-managed lifetimes, native C generation, and large virtual-memory reservations that permit selected arrays to grow in place. Its strict thread isolation and limited dynamic allocation, however, constrain typical server applications.
+
+Strata explores retaining those ideas where useful while supporting:
+
+- Dynamically created objects and graphs with independent lifetimes.
+- Many lightweight virtual threads executing ordinary sequential code.
+- Efficient shared read-heavy state, including caches.
+- Deterministic cleanup of files, sockets, locks, and other resources.
+- Static reference-safety analysis without programmer-written lifetime names such as Rust's `'a`.
+
+**Non-goal:** feature parity with Rust or support for every application architecture. Strata should prioritize understandable semantics over zero runtime overhead at all costs.
+
+## 2. Design principles
+
+1. Ordinary values should remain inexpensive and need no reference-count header.
+2. Programmer-visible reference kinds express ownership; the compiler infers borrowing lifetimes.
+3. Dynamic allocation is explicit through `new`, and produces a strong owning `Ref<T>`.
+4. `WeakRef<T>` breaks strong-reference cycles by not keeping the object alive.
+5. Synchronization is lexical and compiler-enforced; higher-level libraries hide it from application code.
+6. Virtual-thread execution and memory allocation are separate concerns.
+7. Native Strata APIs communicate compile-time lifetime contracts via module metadata.
+8. Foreign calls without verified contracts remain explicitly unsafe.
+9. Optimize only after establishing memory safety and observable behaviour.
+10. **No magic or hidden behaviour, except virtual threads and parking.** What the code says is what happens:
+    - Allocation (`new`), copying, locking (`sync`/`mutate`), and I/O are visible in the source. Nothing buffers,
+      defers, batches, retries, or reorders on the programmer's behalf. `conn.write` sends now; buffering is an
+      explicit type with an explicit `flush`.
+    - Optimizations that change timing or cost, such as response batching or write coalescing, are library features
+      that are opt-in, state their bounds (for example `max_batch` and `max_hold`), and document what they delay.
+      The runtime and compiler may not introduce them silently. A time bound checked between handlers cannot
+      interrupt a running handler (there is no preemption), so such features also require handlers to declare
+      whether they are bounded before anything is held behind them.
+    - The compiler may optimize freely only where behaviour is unobservable (see 4.4); it must preserve identity,
+      destructor timing and ordering.
+    - **The one exception is parking.** A call that may wait looks like an ordinary blocking call: no `async`/`await`,
+      no function colouring. The compiler infers which functions may park (the may-park effect) and sizes their
+      frames. Because this is hidden by design, tooling must make it visible (hover, lints, and error messages that
+      name the call chain), and parking inside `sync`/`mutate` is a compile error.
+
+11. **Every input that can be unbounded has a declared limit, enforced before the data is held.** A header block, a request body, and a
+    parsed document's depth and size all have limits stated by the program (or a documented default). Large payloads are streamed, or
+    spooled to a file and mapped explicitly; they are never parsed into values whole. Exceeding a limit is an error the caller can see
+    (431, 413), not a larger allocation.
+
+## 3. Types and ownership
+
+| Type / construct | Meaning | Lifetime / reclamation |
+|---|---|---|
+| `T` | Ordinary value | Compiler-managed scope, stack, or task storage |
+| `T&` | Borrowed reference | Inferred, statically checked; cannot outlive its referent |
+| `Ref<T>` | Owning reference to a dynamic object | Strong count; destroy object at zero |
+| `WeakRef<T>` | Non-owning observation of a dynamic object | Weak count; control block survives until no weak owners remain |
+| `string` | Immutable string value | Implementation-managed storage, reclaimed when unreferenced |
+| `T[]` | Growable array | Compiler-managed or explicitly allocated backing storage; exact allocation policy TBD |
+
+### 3.1 Dynamic objects
+
+```cpp
+Ref<Parent> parent = new Parent(...);
+Ref<Parent> copy = Ref<Parent>(parent);
+WeakRef<Parent> weak = WeakRef<Parent>(parent);
+Ref<Parent> promoted = Ref<Parent>(weak); // throws if expired
+```
+
+`new T(...)` allocates a new independently managed object, creates its control block and returns `Ref<T>`. Copying a `Ref<T>` increments the strong count rather than copying the object. Converting `WeakRef<T>` to `Ref<T>` atomically increments the strong count *only if it is nonzero*; otherwise it raises `ExpiredReference`.
+
+Direct `WeakRef<T>` access may optionally use implicit temporary promotion and raise `ExpiredReference` when expired; this convenience requires specification, especially for compound expressions. `weak.valid()` may check current liveness but **cannot guarantee later access** across threads. Safe multi-operation use requires promotion to a strong reference.
+
+### 3.2 Parent–child relationships
+
+```cpp
+struct Parent {
+    children: Ref<Child>[]
+}
+
+struct Child {
+    parent: WeakRef<Parent>
+}
+```
+
+The parent strongly owns children; children refer weakly to their parent. This avoids the usual parent–child strong-reference cycle. Reference counting alone does **not** collect arbitrary strong-reference cycles, so weak-edge design remains necessary.
+
+### 3.3 Control blocks
+
+Conceptual layout for a dynamically allocated `Parent`:
+
+```text
+Parent arena slot
++------------------------------+
+| atomic strong count          |
+| atomic weak count            |
+| control / lifetime metadata  |
++------------------------------+
+| Parent fields                |
++------------------------------+
+```
+
+Strong count reaching zero triggers object destruction and resource cleanup. The slot/control block remains until the final weak owner has been released; implementations can use an implicit weak owner while strong owners exist. Promotion must use an atomic conditional increment, not a separate validity check followed by increment. Count overflow and destruction races must be handled.
+
+`Ref<T>[]` is an array of handles, **not** inline `T` objects. Its elements point to objects in the `T` arena; removing an element releases its strong ownership. The array's backing storage is separate.
+
+## 4. Memory allocation
+
+### 4.1 Distinct storage classes
+
+| Storage | Allocation approach | Reclamation |
+|---|---|---|
+| Simple locals | compiler-managed data stacks inspired by Goose | Scope exit |
+| Task temporaries | Virtual-thread-local arenas, with optional nested scopes | Task or sub-scope exit |
+| `new T` | Shared, type-specific slab/arena for fixed-size objects | Strong/weak control-block lifecycle |
+| Variable-size buffers | Size-class allocator or other general variable-size allocator | Owner/buffer lifetime |
+| Growable arrays | Dedicated virtual address regions where worthwhile; alternative managed buffers for many small arrays | Array lifetime |
+| String literals | Static read-only storage | Process lifetime |
+| Runtime strings | Shared compact allocations or inline representation | Last owner / value lifetime |
+
+All allocators may exploit large virtual-address reservations, committing memory pages only as needed. **Virtual-address reservation is a technique, not an ownership model.** Large reservations per object are inappropriate for millions of small strings or arrays.
+
+### 4.2 Per-type arenas
+
+A `new Parent(...)` allocation comes from a shared `Parent` arena, regardless of which virtual thread requested it. The arena is runtime-owned, not task-owned. Each slot contains the fixed-size object and reference-counting metadata. A type arena may lazily allocate slabs and maintain per-OS-worker free-slot caches; cross-thread deallocation must be supported.
+
+Variable-sized fields such as strings and array buffers need their own backing allocations; they do not automatically fit in fixed-size parent slots.
+
+### 4.3 Strings
+
+Proposed default: immutable `string` values with compiler-understood semantics but runtime-provided storage and operations.
+
+- Literals may reside in static read-only data.
+- Short runtime strings may be inline (small-string optimization).
+- Larger strings may share immutable reference-counted backing data.
+- Builders provide mutable construction before producing an immutable string.
+- A size-class allocator is preferable to reserving a huge region per string.
+- Strings in arrays and structs require correct type-aware cleanup when removed or destroyed.
+
+The exact string representation, encoding, equality and substring ownership semantics remain to be specified.
+
+### 4.4 Escape analysis
+
+The compiler may place objects in task-local storage only if it proves they cannot outlive the task or be observed through escaping strong/weak references. It must preserve identity, destructor timing, weak-reference semantics and synchronization behaviour; it must not optimize by silently invalidating handles. Start with independently reclaimable allocations for all `new` objects and treat placement optimizations as later work.
+
+## 5. Reference and lifetime analysis
+
+Lifetime parameters are **not** written as named generics. Borrowing is expressed with `T&`; the compiler infers which parameters, object fields or static objects the returned borrow depends on.
+
+```cpp
+fn choose(a: Customer&, b: Customer&, first: bool) -> Customer& {
+    if first { return a; }
+    return b;
+}
+```
+
+The inferred contract records that a returned reference may originate from either input. The caller must not retain it beyond the safe common lifetime. This information is needed only by the compiler; no runtime lifetime query facility is required.
+
+### 5.1 Separate compilation
+
+A compiled native Strata library exports an interface artifact containing type definitions, generic information, borrow origins, relevant mutation/escape effects, and lifetime constraints. For example:
+
+```text
+choose(Customer&, Customer&, bool) -> Customer&
+return origins: parameter 0 | parameter 1
+```
+
+Such metadata is a **compile-time dependency**. The executable need not contain it. Changing an inferred contract may be an API compatibility change even when the source signature stays the same.
+
+### 5.2 C interoperability
+
+C declarations contain no trustworthy ownership or lifetime semantics. Bindings must supply explicit contracts for returned or retained pointers, transferred ownership, deallocation, and invalidation; otherwise pointer-based FFI operations are unsafe. A wrapper can make a copy or acquire ownership when the C API's documented guarantee permits it. Strata must not infer guarantees from an opaque C function body it cannot inspect.
+
+## 6. Virtual threads
+
+Strata aims for Java-virtual-thread-style programming: thousands of logical tasks running ordinary blocking-looking code on a limited number of OS workers.
+
+```cpp
+fn serve(listener: Listener&) {
+    loop {
+        let socket = listener.accept();
+        vthread_spawn(handle_client, socket);
+    }
+}
+```
+
+### 6.1 Initial runtime approach
+
+- Stackful fibers, with independently managed execution stacks.
+- Cooperative scheduling initially, followed by an OS-thread worker pool.
+- Nonblocking sockets plus `epoll` on Linux, with scheduler-aware wrappers for `read`, `write`, `accept`, timers and waits.
+- Synchronization waits **park virtual threads**, not carrier OS threads.
+- Task-local globals and task arenas belong to the logical virtual thread, not the OS worker.
+- Start with thread-affine fibers; cross-carrier migration/work stealing is a later feature requiring FFI/TLS audits.
+
+Direct blocking C calls may pin or block the OS worker unless executed through adapted wrappers or a designated blocking pool. Stackful switching needs ABI-correct register handling, guard pages, safe suspension points and a defined cancellation protocol.
+
+### 6.2 Scope and lifetime
+
+A virtual thread's **execution stack**, **task temporary arena**, and **reference-counted dynamic objects** are distinct. Task exit may reclaim the first two, but it cannot destroy `Ref<T>` allocations still owned by other tasks.
+
+Cancellation is cooperative: wake the task, unwind/execute cleanup safely, then reclaim its execution and task-local storage. A suspended task must not simply have its memory discarded.
+
+### 6.3 Per-request child vthreads (proposal, prototyped in C)
+
+A connection may run pipelined safe requests as child vthreads in a scope that waits for them, and send the completed
+prefix of responses in request order (RFC 7230 6.3.2). This makes response batching a consequence of the structure (a
+response waits only behind an unfinished earlier one) instead of a library hold with timers. Non-safe requests and
+routes declared unbounded act as barriers; depth is bounded. It overlaps handlers only where they park: a CPU-bound
+handler on a pinned worker is not helped. Measurements: `bench/results/http.md`.
+
+## 7. Shared state and synchronization
+
+Two constructs control access to shared mutable objects:
+
+```cpp
+sync(cache) {
+    // Concurrent read-only access.
+}
+
+mutate(cache) {
+    // Exclusive read/write access.
+}
+```
+
+The compiler rejects mutation inside `sync`, unsynchronized access to objects that may be concurrently mutated, and borrowed references that escape a protected block. References used *within* the block may be borrowed; values crossing the boundary require an independent lifetime (e.g., copy/move or a safely acquired owning reference). Deep copies must be explicit in the semantic specification for compound values, even if the source syntax elides the operation.
+
+Locks are automatically released on every exit path, including errors, exceptions and any supported non-local returns.
+
+### 7.1 Admission and fairness
+
+Requested ordering policy: fair FIFO admission of access requests, batching consecutive readers, with each writer exclusive. New readers arriving behind a waiting writer cannot overtake it; later writers cannot indefinitely overtake waiting readers. This avoids starvation caused solely by admission policy, though a non-terminating holder can still block progress.
+
+**Waiting parks the vthread.** Entering `sync`/`mutate` is a parking operation: if the lock is held, the vthread joins the lock's FIFO queue and parks, and the worker runs other vthreads. Unlock wakes the next waiter(s) on whichever worker they belong to. An implementation may spin for a bounded time before parking, because hold times are short (the body cannot park); the contract is unchanged and only the cost differs. This matters: with FIFO fairness, one queued writer makes every following reader queue behind it, so a pure park lost 55% of throughput at a 10% write mix and 75% at 50% writes (4 workers, one lock), and 2000 rounds of spinning removed the loss (`bench/results/miniredis.md`). The body of the block still cannot park (compile error), so a holder never yields the lock to the scheduler, two vthreads on one worker never contend, and hold time is bounded by the code in the block. Consequences: a function containing `sync`/`mutate` is inferred to park (tooling shows it at the block); a `cleanup()` cannot enter one (cleanup never parks), so cleanup uses non-parking operations (atomic flags, `tryPush`) and leaves the locked work to a later, parking pass.
+
+**Multi-object blocks.** `mutate(a, b)` and `sync(a, b)` (any mix, e.g. `mutate(a) sync(b)` written as one head) acquire all their objects before the body runs or not at all, so mis-ordered blocks elsewhere (`mutate(b, a)`, `sync(b, a)`) cannot deadlock with them. The runtime tries the locks in a fixed global order: the address of each object's lock word, or `(arena id, slot index)` for an object in an arena whose storage can move. The order only has to be consistent among live locks being acquired together (the acquirer holds a `Ref` to each, so none can be freed or reused meanwhile), so no per-allocation sequence number exists. Arenas do not compact, and a chunk is released only when it is empty, so a live object's address never changes; only a type that appears in a `sync`/`mutate` head has a lock word, and other types pay nothing. If one is busy, it releases everything it took, parks on THAT lock's queue, and retries from the start when woken. Waiting on the blocker's queue replaces a timed backoff: there is no sleep, no spinning and no livelock, and a retrying acquirer keeps its original arrival ticket, so it is served ahead of later arrivals (no starvation by repeated losing races). Retrying is safe only because no body code has run yet. The same reason is why **nested** acquisition (`mutate(a) { mutate(b) { } }`) is a compile error when the inner object is not already in the outer head: a failed inner acquire could not undo what the outer body did. Same lock twice in one head or nested is also an error (no reentrancy). Upgrading read to write is not supported: release and acquire as `mutate`, and recheck.
+
+### 7.2 Encapsulation in libraries
+
+Application code should not need to write synchronization blocks for each cache operation:
+
+```cpp
+fn cache_get(cache: Ref<Cache>, key: i64) -> i64 {
+    sync(cache) {
+        return cache.entries.get(key); // scalar copied before unlock
+    }
+}
+
+fn cache_put(cache: Ref<Cache>, key: i64, value: i64) {
+    mutate(cache) {
+        cache.entries.insert(key, value);
+    }
+}
+```
+
+Callers use `cache_get` and `cache_put` like ordinary functions. Read-modify-write actions require their own atomic API operation, not a separate get followed by put. Encapsulation also requires module visibility/access-control rules to prevent bypassing protected operations.
+
+`Ref<T>` governs object *lifetime*; `sync` and `mutate` govern *concurrent access*. Neither substitutes for the other.
+
+### 7.3 Process-global storage
+
+A narrower alternative is explicit `shared var` / `shared let` declarations at module scope. Ordinary Strata globals are proposed to remain virtual-thread-local by default. This is simpler for process-lifetime caches but less flexible than dynamically created `Ref<Cache>` objects. We have discussed both models; whether both should exist, and whether `Ref<T>` implies shareability by default, remains unsettled.
+
+## 8. Messaging
+
+Consider typed `qput` / `qget` message passing inspired by Goose. A possible incremental extension adds addressed messages and request/reply correlation:
+
+```cpp
+let pending = qput(cache_owner, CacheRequest { key: 100 });
+let reply = pending.response<CacheReply>();
+
+// Owner side:
+let message = qget<CacheRequest>();
+message.respond(CacheReply { value: 42 });
+```
+
+The runtime attaches sender/destination identity and a unique request token; replying should be single-use. This solves the type-wide queue routing problem where unrelated consumers can take each other's replies. It retains a shared-nothing option for applications that prefer owner-worker messaging.
+
+A single cache owner serializes all lookups; sharding by key provides parallelism across partitions but not concurrent reads of the same hot partition. A shared-memory cache with `sync`/`mutate` better serves some read-heavy workloads. Both mechanisms can coexist.
+
+## 9. Deterministic resource cleanup
+
+Memory reclamation and resource cleanup are separate concerns.
+
+- File and socket handles close when their owning scope ends.
+- DB connections return to pools on scope exit.
+- `sync`/`mutate` permissions release automatically.
+- A resource must not be implicitly copied if that causes double-close.
+- Cleanup must run on normal return, errors, exceptions, cancellation and non-local returns.
+- Task-level cleanup occurs **before** task arena/stack reclamation.
+- Cleanup never parks: it runs to completion without waiting. A type that holds unsent data (for example a batching
+  response writer) makes one best-effort, non-blocking attempt when dropped; code that needs the data to be sent calls
+  an explicit `flush()` (which may park) before the value goes out of scope.
+- Ending a network connection from the server side is a hand-off, not a wait: `Conn.lingerClose(time, maxBytes)` consumes the connection and returns at once; the
+  runtime half-closes it, discards the client's remaining input for a bounded time and byte count, and then closes it. A program uses it when the server ends the
+  connection while the client may still be sending (always after an error answer; after a normal `Connection: close` only if input is unread), because closing a socket
+  that holds unread input makes the kernel reset the connection and the client can lose the response. The policy lives in the program (`runConnection`), the mechanism in the runtime.
+
+A resource type may define an automatically invoked cleanup method. The exact ownership-transfer syntax is not yet chosen. Cleanup must be deterministic, must run exactly once, and must not depend on a tracing garbage collector.
+
+## 10. Key unresolved questions
+
+1. **Compiler implementation:** Build a fresh compiler or adapt a mature front-end/backend, and which Goose virtual-memory techniques are independently worth reproducing?
+2. **Ref thread safety:** Should all `Ref<T>` counts be atomic by default, or may compiler-proven confinement use a non-atomic implementation? Migration from local to shared ownership must be safe.
+3. **Access model:** Is `sync`/`mutate` required for all `Ref<T>` objects, or only those that may cross tasks? How is shareability proven or declared?
+4. **Arrays:** When should a growable array use a dedicated virtual region rather than a relocatable managed buffer? How are thousands of independently sized arrays represented?
+   *Direction chosen for small bounded buffers (prototyped in `bench/c/http`):* the runtime provides `u8[]` as a pooled size-class array
+   (512 B, 2 KB, 8 KB, 16 KB in the prototype). It starts in the smallest class, compacts when full, and `grow()` copies it into the
+   next class; the source states no size, only a limit where one matters (a maximum header block). Code that needs a stable
+   address must use offsets (a request is a pair of offsets), so moving is safe. Large and unbounded arrays (bodies, big
+   collections) are partly decided for request bodies (prototyped), and the decision is a runtime-library feature, not a language one: two readers.
+   The standard reader reads a body into memory up to a small configurable maximum (1 MB by default, for typical API servers) and needs no files.
+   A route opts into the upload reader for file uploads and other large bodies; it streams the body into an unnamed temporary file under its own, much
+   larger limit and hands the handler the finished file to link, read or map explicitly. Both refuse an oversize body with 413 before it is held, and
+   nothing parses a body of that size into a value; large documents get a streaming parser over the file. All the limits, the upload directory and the
+   fairness quantum (how many body bytes a connection processes before it yields) are runtime configuration passed in by the host.
+Dedicated virtual reservations, as in Goose, remain the candidate for large in-memory arrays and are not built or measured.
+5. **Strings:** Exact representation, slicing semantics, UTF-8 indexing, allocation and value-copy costs.
+6. **Reference cycles:** Document weak-reference discipline; consider optional diagnostics, not automatic cycle collection initially.
+7. **Exception model:** Interaction among thrown errors, normal returns, non-local returns, destructors and task cancellation.
+   *Direction chosen:* errors are exceptions (`throw`, `try`/`catch`), not result values with a propagation marker. A function declares
+   what can escape it with `throws A, B`; the compiler checks the list, so throwing is visible in signatures (which also answers
+   the tension with principle 10: exceptions are control flow, but declared control flow). No `throws` clause means nothing
+   escapes. A throw runs the cleanups of every scope it leaves; cleanup methods never park and never throw. `spawn f(...)`
+   requires f to declare no `throws`, so a vthread's root function handles its own errors. Open: how a throw interacts with a
+   scope that still has child vthreads (the prototype source assumes the scope waits for them first), and whether a handler
+   type such as `fn(u8[]&): Resp throws Exception` is the right way to say "may throw anything".
+   *Syntax direction (illustrative, used in `bench/c/http/server.stra`):* nullable `T?` with null-check narrowing instead of an
+   Option type; methods declared inside the type, with `self` available but optional (needed only to disambiguate a member from
+   a parameter and to refer to the value itself); tagged enums with an exhaustive `switch` whose arms are `Pattern -> { ... }` (no `case` keyword, no fallthrough, commas to list several
+   values, `default` required for non-enum switches; ranges, guards, bindings and destructuring deferred) (`enum Cost { Bounded(Duration) Unbounded }`);
+   `let`/`var`; camelCase function names.
+8. **Virtual-thread stacks:** Fixed reserve with guard pages versus segmented/growable stacks; native-code suspension and migration limits.
+9. **Synchronized callbacks and escaping values:** How to handle callbacks, function pointers, composite references and nested transactions safely.
+10. **API stability:** How to version exported inferred lifetime/effect metadata and diagnose breaking changes.
+
+## 11. Suggested implementation sequence
+
+### Phase 0 — Feasibility spike
+
+Prototype a standalone Strata front-end and minimal C emitter. Study Goose’s compiler-managed storage and test borrowed-return analysis and independently allocated type slots. Select reusable implementation ideas based on measured feasibility, without assuming source-level compatibility.
+
+### Phase 1 — Ownership foundations
+
+Implement `Ref<T>`, `WeakRef<T>`, `new`, control blocks, typed arenas, destructor generation, weak promotion and negative tests for stale references. Use atomic counts initially.
+
+### Phase 2 — Strings and dynamic collections
+
+Implement a variable-size allocator, immutable strings, array-of-Ref cleanup and a stress test of many small arrays and object graphs. Verify no unbounded arena retention.
+
+### Phase 3 — Scoped shared access
+
+Implement `sync` and `mutate`, a scheduler-compatible reader/writer admission queue, copy/escape rules and generated cleanup on every control-flow exit. Add a shared cache benchmark.
+
+### Phase 4 — Virtual-thread runtime
+
+Implement stackful execution, cooperative scheduler, timers, `epoll`-based I/O and a bounded native carrier-thread pool. Add cancellation and structured cleanup. Benchmark tens of thousands of mostly idle connections.
+
+### Phase 5 — Library interfaces and FFI
+
+Export inferred lifetime/effect contracts at compilation. Support separately compiled libraries and safe C-binding wrappers with explicit contracts.
+
+### Phase 6 — Real application validation
+
+Build an HTTP service with dynamic request objects, a shared cache and file/socket lifetimes. Measure latency, throughput, peak resident memory, virtual memory consumption, contention and allocator behaviour against a comparable Rust/Tokio or Java virtual-thread implementation.
+
+## 12. Success criteria
+
+Strata should demonstrate that an ordinary concurrent server can be written with:
+
+- Readable procedural code and no named lifetime annotations.
+- Memory safety without a tracing garbage collector.
+- Safe shared ownership through `Ref<T>` / `WeakRef<T>`.
+- Compiler-enforced, encapsulated synchronization.
+- Scalable logical tasks with straightforward blocking-style I/O.
+- Predictable resource cleanup and measured memory overhead.
+
+Strata remains an independent language regardless of the compiler implementation chosen. Reuse Goose-inspired virtual-memory techniques only where benchmarking and simplicity justify them.
+
+## 13. Naming and implementation identity
+
+- **Language:** Strata
+- **Proposed command:** `strata`
+- **Proposed source extension:** `.stra`
+- **Suggested repository name:** `strata-lang` (availability not verified)
+- **Suggested compiler backend for initial prototype:** generated C; not a permanent ABI commitment.
+
+The name and syntax are working choices. No availability, trademark or namespace clearance has been completed.

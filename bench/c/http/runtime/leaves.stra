@@ -1,0 +1,94 @@
+// runtime/leaves.stra - the runtime's interface: the functions, types and exceptions that Strata cannot define itself because they are the
+// operating system and the scheduler. Implemented in C by runtime/rt.h (tasks, pools, scheduler, timers), runtime/rt_buf.h (buffers),
+// runtime/rt_io.h (socket I/O, lingering close) and runtime/rt_net.h (workers, listener, accept loop). Everything that CAN be written in
+// Strata lives in the other runtime/*.stra and http/*.stra files, not here.
+//
+// An `extern` declaration has no body, so the compiler has nothing to analyse and cannot infer whether the function waits. That one fact
+// has to be stated, with the `parks` modifier; an extern function without it returns without waiting. Everywhere else the compiler infers
+// parking from the code, and tooling shows it, so it is never written.
+
+exception IoError                                        // a socket or file operation failed
+
+// Input buffers are growable arrays supplied by the runtime (`u8[]`); the source never states a size. The runtime keeps a few size
+// classes (runtime/rt_buf.h: 512 B, 2 KB, 8 KB, 16 KB). A buffer starts in the smallest class, compacts when its tail is full, and
+// `grow()` moves it to the next class only when it is full of one unfinished header block. Because a Request is a pair of
+// offsets, a move invalidates nothing. The one number a program does choose is the largest header block it accepts
+// (`ServerConfig.maxHead`); beyond it the reader throws TooLarge and the connection answers 431. Request bodies are a separate mechanism
+// (http/body.stra): two readers, a small in-memory one for ordinary routes and a file-backed one for uploads, both limited, both streaming.
+// Output (a completed prefix, held responses) is one write's worth, a fixed unit; a longer pipeline is sent in several writes.
+const OUTSZ: usize = 2048
+
+// ---------- the scheduler ----------
+
+extern parks fn sleep(d: Duration)                       // registers (deadline, task) in the worker's timer heap and parks (W_TIMER)
+extern parks fn yield()                                  // the task goes to the back of the run queue and resumes in its turn (server.c: yield_now)
+extern parks fn waitAny(sources: Wakeup...)              // parks until any source is ready (server.c: park(t, W_RD | W_CHILD))
+
+// A wait source for waitAny. scopeChild() is ready when some child of the current scope finishes: a finishing child signals its scope and,
+// if the connection is parked in waitAny, makes it runnable (server.c: req_resume).
+extern struct Wakeup {
+    static fn scopeChild(): Wakeup
+}
+
+// The handle `spawn` returns; it refers to a child's frame in the task arena. (`spawn f(args)` and `scope { ... }` are language
+// constructs: spawn enqueues a child vthread whose function throws nothing, and leaving a scope, normally or by an exception, first
+// waits for every child.)
+extern struct Task<T> {
+    static fn completed(value: T): Task<T>               // a task that is already finished (an inline request). server.c: when the ring is empty it
+                                                         // appends straight to the output instead; an error answer uses push_done()
+    fn isDone(): bool                                    // reads the done flag the child sets as its LAST step, after its result is stored.
+                                                         // A plain read: child and parent run on the same worker, one at a time
+    fn peek(): T&                                        // the result, without moving it; only once done
+    fn result(): T                                       // moves the result out and frees the child's frame
+}
+
+// ---------- sockets ----------
+
+extern struct Conn {
+    parks fn recv(buf: u8[]&): usize throws IoError      // parks on EAGAIN until readable (W_RD). 0 = the peer closed
+    parks fn send(bytes: u8[]&): usize throws IoError    // parks on EAGAIN until writable (W_WR)
+    fn tryRecv(buf: u8[]&): usize? throws IoError        // never parks. null = nothing to read right now, 0 = the peer closed
+    fn trySend(bytes: u8[]&): usize?                     // never parks, never throws. null = would block. For best-effort cleanup
+    parks fn waitReadable() throws IoError               // parks until the socket has input, holding no buffer
+    fn readableHint(): bool                              // has the poller reported input since the last EAGAIN? (rd_ready)
+    fn readableWakeup(): Wakeup                          // a wait source for waitAny
+    fn hasUnread(): bool                                 // does the socket still hold input nobody has read? (ioctl FIONREAD)
+    fn lingerClose(time: Duration, maxBytes: u64)        // CONSUMES the connection and does not park: half-closes the write side (the client sees the
+                                                         // response and a clean end), then the runtime reads and discards input until the client closes,
+                                                         // `time` passes or `maxBytes` have been discarded, and then closes it. server.c: start_linger /
+                                                         // linger_resume; its timeout is cancellable
+}
+
+extern struct Listener {
+    static fn bindReusePort(port: u16): Listener throws IoError
+    parks fn accept(): Conn throws IoError               // parks until a client arrives
+}
+
+// ---------- memory and files ----------
+
+extern impl u8[] {                                       // the runtime's growable array: starts in the smallest size class, owns nothing until used
+    fn capacity(): usize                                 // the current class size
+    fn grow()                                            // moves the contents to the next size class and frees the old block
+    fn moveWithin(range, to)                             // memmove inside the array
+}
+
+struct OutBuf { data: u8[OUTSZ] }                        // pool-allocated; never a local, so never inside a frame. (Moved here from http/types.stra:
+                                                         // it is the runtime's, and the HTTP and Redis libraries both use it.)
+extern let outPool: OutPool                              // fixed-size output buffers
+extern struct OutPool {
+    fn get(): OutBuf                                     // a buffer whose cleanup() returns it to the pool
+}
+
+extern struct File {
+    static fn openTemp(dir: string): File throws IoError // an unnamed temporary file (O_TMPFILE): it has no name and is deleted when closed
+    parks fn write(bytes: u8[]&) throws IoError          // blocking disk I/O is offloaded to a blocking pool (the third call class), so it parks.
+                                                         // server.c writes directly from the worker instead (documented in results/http.md)
+    fn length(): u64
+    fn map(): Mapping throws IoError                     // an explicit read-only mmap of the file
+}
+extern struct Mapping { }                                // cleanup() unmaps it
+
+extern struct Crc32 {                                    // incremental digest (the prototype uses it to check bodies byte for byte)
+    fn update(bytes: u8[]&)
+    fn value(): u32
+}

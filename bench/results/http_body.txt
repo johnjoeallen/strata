@@ -1,0 +1,35 @@
+## after adding request bodies (1 worker, 16 conns)
+concurrent, always spawn, K=16  conns=16 K=16 | rps=4098740 | first_resp_us mean=62 max=3818
+concurrent, always spawn, K=16  conns=16 K=16 | rps=4077031 | first_resp_us mean=62 max=4638
+concurrent, always spawn, K=16  conns=16 K=16 | rps=4068291 | first_resp_us mean=62 max=5137
+concurrent inline, K=1           conns=16 K=1 | rps=295916 | first_resp_us mean=0 max=0
+sequential, K=1                 conns=16 K=1 | rps=304525 | first_resp_us mean=0 max=0
+concurrent inline, K=1           conns=16 K=1 | rps=294397 | first_resp_us mean=0 max=0
+sequential, K=1                 conns=16 K=1 | rps=303420 | first_resp_us mean=0 max=0
+## idle memory per connection, 100k connections, 4 workers
+-- server conc=0
+N=100000 srcips=9 | server_rss_delta=8 MB (88 B/conn) | client_rss=4 MB | system_delta=642 MB | kernel_est=3300 B/socket
+-- server conc=1
+N=100000 srcips=9 | server_rss_delta=18 MB (192 B/conn) | client_rss=4 MB | system_delta=673 MB | kernel_est=3409 B/sock
+## ordinary requests (16 conns, K=1) on the SAME worker, with and without 200 MB uploads running (before any fairness fix)
+no upload               | rps=320988 | lat_us p50=48 p90=55 p99=67 p999=82 max=167
+uploads running         | rps=4049 | lat_us p50=2006 p90=7034 p99=103701 p999=103701 max=103701
+uploads completed: 17
+## fairness: ordinary requests (16 conns, K=1) on the SAME worker while 200 MB uploads run (6 s of uploads per run)
+no upload (baseline)                       | rps=323849 | lat_us p50=48 p90=54 p99=68 p999=83 max=153 | 
+uploads, NEVER yield (negative control)     | rps=1811 | lat_us p50=3331 p90=15929 p99=365777 p999=365777 max=365777 | 
+uploads, budget 256 KB                      | rps=25197 | lat_us p50=499 p90=946 p99=988 p999=11677 max=12734 | 
+uploads, budget 64 KB (default)             | rps=77792 | lat_us p50=167 p90=282 p99=299 p999=346 max=13791 | 
+uploads, budget 16 KB                       | rps=181448 | lat_us p50=81 p90=108 p99=118 p999=136 max=12197 | 
+uploads, budget 8 KB                        | rps=234407 | lat_us p50=64 p90=77 p99=90 p999=105 max=12723 | 
+## the price of fairness: upload throughput when sharing the worker (6 s of back-to-back 200 MB uploads)
+budget 8 KB,   with other traffic | uploads in ~6.5 s: 8 x 200 MB = 266 MB/s | others: rps=234713 p50=64 p90=77 p99=89
+budget 16 KB,  with other traffic | uploads in ~6.5 s: 10 x 200 MB = 333 MB/s | others: rps=182057 p50=81 p90=108 p99=118
+budget 64 KB,  with other traffic | uploads in ~6.5 s: 14 x 200 MB = 466 MB/s | others: rps=77795 p50=167 p90=281 p99=297
+budget 256 KB, with other traffic | uploads in ~6.5 s: 16 x 200 MB = 533 MB/s | others: rps=25487 p50=498 p90=942 p99=980
+budget 64 KB,  uploads alone      | uploads in ~6.5 s: 17 x 200 MB = 566 MB/s | others:  
+## yield= is a runtime parameter (uploads of 200 MB running back to back on the same worker as 16 ordinary connections)
+yield=4096     | rps=241189 | p50=62 p90=74 p99=83 | uploads: 8 x 200 MB = 266 MB/suploads: 0 x 200 MB = 0 MB/s
+yield=65536 (default) | rps=77511 | p50=167 p90=282 p99=299 | uploads: 14 x 200 MB = 466 MB/suploads: 0 x 200 MB = 0 MB/s
+yield=1048576  | rps=5538 | p50=3562 p90=3644 p99=4713 | uploads: 16 x 200 MB = 533 MB/suploads: 0 x 200 MB = 0 MB/s
+old name bodybudget=16384 | rps=181813 | p50=80 p90=108 p99=118 | uploads: 10 x 200 MB = 333 MB/suploads: 0 x 200 MB = 0 MB/s

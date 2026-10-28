@@ -1,0 +1,80 @@
+## instant handlers, 1 worker pinned to core 0, 16 connections, K=16 pipelined (requests/s). Every server gets the same requests (Host header on all)
+C    sequential (flush each)       | rps=461915 | first_resp_us mean=524 max=3674 | p50=549 p90=565 p99=646 | err connect=0 io=0 partial=0
+C    concurrent (spawn)            | rps=4050152 | first_resp_us mean=63 max=3322 | p50=62 p90=66 p99=75 | err connect=0 io=0 partial=0
+Rust sequential                    | rps=451450 | first_resp_us mean=536 max=5016 | p50=558 p90=598 p99=673 | err connect=0 io=0 partial=0
+Rust concurrent (spawn)            | rps=2077519 | first_resp_us mean=123 max=3367 | p50=122 p90=132 p99=147 | err connect=0 io=0 partial=0
+Go   pipe sequential               | rps=429229 | first_resp_us mean=564 max=2040 | p50=590 p90=1030 p99=1183 | err connect=0 io=0 partial=0
+Go   pipe concurrent, batch        | rps=2124948 | first_resp_us mean=120 max=6081 | p50=111 p90=203 p99=229 | err connect=0 io=0 partial=0
+Go   pipe concurrent, no Gosched   | rps=391489 | first_resp_us mean=620 max=6405 | p50=645 p90=1092 p99=1252 | err connect=0 io=0 partial=0
+Go   net/http                      | rps=218714 | first_resp_us mean=1091 max=5365 | p50=1151 p90=1999 p99=2257 | err connect=0 io=0 partial=0
+C    sequential (flush each)       | rps=456797 | first_resp_us mean=530 max=1872 | p50=551 p90=609 p99=661 | err connect=0 io=0 partial=0
+C    concurrent (spawn)            | rps=4058031 | first_resp_us mean=63 max=383 | p50=62 p90=66 p99=73 | err connect=0 io=0 partial=0
+Rust sequential                    | rps=450506 | first_resp_us mean=538 max=3685 | p50=558 p90=615 p99=669 | err connect=0 io=0 partial=0
+Rust concurrent (spawn)            | rps=2103060 | first_resp_us mean=121 max=3367 | p50=121 p90=131 p99=146 | err connect=0 io=0 partial=0
+Go   pipe sequential               | rps=431915 | first_resp_us mean=561 max=3886 | p50=586 p90=1024 p99=1181 | err connect=0 io=0 partial=0
+Go   pipe concurrent, batch        | rps=2119074 | first_resp_us mean=120 max=6323 | p50=111 p90=203 p99=228 | err connect=0 io=0 partial=0
+Go   pipe concurrent, no Gosched   | rps=396236 | first_resp_us mean=613 max=4519 | p50=638 p90=1081 p99=1223 | err connect=0 io=0 partial=0
+Go   net/http                      | rps=219151 | first_resp_us mean=1089 max=5510 | p50=1150 p90=1997 p99=2247 | err connect=0 io=0 partial=0
+## no pipelining (K=1), 16 connections
+C    sequential                    | rps=310450 | first_resp_us mean=0 max=0 | p50=50 p90=55 p99=60 | err connect=0 io=0 partial=0
+C    concurrent inline             | rps=303544 | first_resp_us mean=0 max=0 | p50=51 p90=58 p99=62 | err connect=0 io=0 partial=0
+Rust sequential                    | rps=291688 | first_resp_us mean=0 max=0 | p50=53 p90=59 p99=65 | err connect=0 io=0 partial=0
+Go   pipe sequential               | rps=276655 | first_resp_us mean=0 max=0 | p50=57 p90=97 p99=113 | err connect=0 io=0 partial=0
+Go   pipe concurrent inline        | rps=271521 | first_resp_us mean=0 max=0 | p50=58 p90=99 p99=114 | err connect=0 io=0 partial=0
+Go   net/http                      | rps=174159 | first_resp_us mean=0 max=0 | p50=89 p90=154 p99=191 | err connect=0 io=0 partial=0
+C    sequential                    | rps=307192 | first_resp_us mean=0 max=0 | p50=50 p90=57 p99=61 | err connect=0 io=0 partial=0
+C    concurrent inline             | rps=301140 | first_resp_us mean=0 max=0 | p50=52 p90=58 p99=63 | err connect=0 io=0 partial=0
+Rust sequential                    | rps=290407 | first_resp_us mean=0 max=0 | p50=53 p90=60 p99=66 | err connect=0 io=0 partial=0
+Go   pipe sequential               | rps=279043 | first_resp_us mean=0 max=0 | p50=57 p90=97 p99=110 | err connect=0 io=0 partial=0
+Go   pipe concurrent inline        | rps=274334 | first_resp_us mean=0 max=0 | p50=57 p90=98 p99=114 | err connect=0 io=0 partial=0
+Go   net/http                      | rps=173745 | first_resp_us mean=0 max=0 | p50=89 p90=155 p99=193 | err connect=0 io=0 partial=0
+## parking handlers, K=16 pipelined, 1 worker. last response = batch_done p50 (us). Timer floors: Tokio ~1 ms, Go and C sub-ms
+sleep 200us conns=1  C conc        | rps=60004 | first_resp_us mean=266 max=3322 | p50=265 p90=266 p99=272 | err connect=0 io=0 partial=0
+sleep 200us conns=1  Rust conc     | rps=12554 | first_resp_us mean=1269 max=4975 | p50=1075 p90=2077 p99=2093 | err connect=0 io=0 partial=0
+sleep 200us conns=1  Go pipe conc  | rps=14837 | first_resp_us mean=1078 max=7213 | p50=1075 p90=1077 p99=1088 | err connect=0 io=0 partial=0
+sleep 200us conns=1  Go pipe seq   | rps=949 | first_resp_us mean=1071 max=1669 | p50=16904 p90=16910 p99=17262 | err connect=0 io=0 partial=0
+sleep 200us conns=1  Go net/http   | rps=944 | first_resp_us mean=1067 max=1542 | p50=16953 p90=16965 p99=19311 | err connect=0 io=0 partial=0
+sleep 200us conns=16  C conc       | rps=791969 | first_resp_us mean=323 max=6840 | p50=322 p90=326 p99=330 | err connect=0 io=0 partial=0
+sleep 200us conns=16  Rust conc    | rps=176700 | first_resp_us mean=1446 max=5507 | p50=1239 p90=2250 p99=2349 | err connect=0 io=0 partial=0
+sleep 200us conns=16  Go pipe conc | rps=206390 | first_resp_us mean=1240 max=4643 | p50=1260 p90=1315 p99=1453 | err connect=0 io=0 partial=0
+sleep 200us conns=16  Go pipe seq  | rps=14549 | first_resp_us mean=1114 max=1788 | p50=17585 p90=17627 p99=18114 | err connect=0 io=0 partial=0
+sleep 200us conns=16  Go net/http  | rps=14080 | first_resp_us mean=1183 max=4986 | p50=18401 p90=18447 p99=18653 | err connect=0 io=0 partial=0
+sleep 1000us conns=1  C conc       | rps=14864 | first_resp_us mean=1076 max=4682 | p50=1066 p90=1069 p99=1286 | err connect=0 io=0 partial=0
+sleep 1000us conns=1  Rust conc    | rps=7658 | first_resp_us mean=2081 max=2554 | p50=2088 p90=2099 p99=2148 | err connect=0 io=0 partial=0
+sleep 1000us conns=1  Go pipe conc | rps=14778 | first_resp_us mean=1082 max=3912 | p50=1075 p90=1078 p99=1108 | err connect=0 io=0 partial=0
+sleep 1000us conns=1  Go pipe seq  | rps=949 | first_resp_us mean=1077 max=2798 | p50=16905 p90=16927 p99=16953 | err connect=0 io=0 partial=0
+sleep 1000us conns=1  Go net/http  | rps=944 | first_resp_us mean=1073 max=1379 | p50=16951 p90=16960 p99=17135 | err connect=0 io=0 partial=0
+sleep 1000us conns=16  C conc      | rps=233595 | first_resp_us mean=1095 max=5226 | p50=1084 p90=1123 p99=1130 | err connect=0 io=0 partial=0
+sleep 1000us conns=16  Rust conc   | rps=113192 | first_resp_us mean=2259 max=4679 | p50=2292 p90=2353 p99=2408 | err connect=0 io=0 partial=0
+sleep 1000us conns=16  Go pipe conc | rps=200912 | first_resp_us mean=1274 max=5839 | p50=1260 p90=1317 p99=1548 | err connect=0 io=0 partial=0
+sleep 1000us conns=16  Go pipe seq | rps=14592 | first_resp_us mean=1114 max=1186 | p50=17565 p90=17604 p99=17644 | err connect=0 io=0 partial=0
+sleep 1000us conns=16  Go net/http | rps=13824 | first_resp_us mean=1181 max=2103 | p50=18406 p90=18554 p99=18674 | err connect=0 io=0 partial=0
+## one slow CPU request (~1 ms) at position 9 of 16, instant handlers, one unloaded connection: first response
+C    sequential                    | rps=16208 | first_resp_us mean=12 max=31 | p50=945 p90=1181 p99=1192 | err connect=0 io=0 partial=0
+C    concurrent                    | rps=16634 | first_resp_us mean=10 max=23 | p50=920 p90=1154 p99=1161 | err connect=0 io=0 partial=0
+Rust concurrent                    | rps=16298 | first_resp_us mean=12 max=115 | p50=921 p90=1157 p99=1166 | err connect=0 io=0 partial=0
+Go   pipe sequential               | rps=16624 | first_resp_us mean=12 max=508 | p50=947 p90=957 p99=1189 | err connect=0 io=0 partial=0
+Go   pipe concurrent               | rps=17050 | first_resp_us mean=12 max=99 | p50=923 p90=933 p99=1163 | err connect=0 io=0 partial=0
+Go   net/http                      | rps=16010 | first_resp_us mean=10 max=133 | p50=983 p90=1005 p99=1234 | err connect=0 io=0 partial=0
+## idle memory per connection at 100,000 connections, 4 workers (server RSS delta), then 64 active connections
+-- C conc=0 (sequential)
+N=100000 srcips=9 | server_rss_delta=8 MB (89 B/conn) | client_rss=4 MB | system_delta=652 MB | kernel_est=3349 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3895861 rps=1298589 | lat_us p50=40 p90=73 p99=87 p999=99 max=1413 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=634 MB
+-- C conc=1 (pipelined)
+N=100000 srcips=9 | server_rss_delta=18 MB (192 B/conn) | client_rss=4 MB | system_delta=659 MB | kernel_est=3336 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3878992 rps=1292967 | lat_us p50=50 p90=67 p99=79 p999=91 max=155 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=642 MB
+-- Rust conc=0
+N=100000 srcips=9 | server_rss_delta=134 MB (1413 B/conn) | client_rss=4 MB | system_delta=731 MB | kernel_est=3103 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3691011 rps=1230308 | lat_us p50=53 p90=68 p99=77 p999=85 max=529 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=761 MB
+-- Rust conc=1
+N=100000 srcips=9 | server_rss_delta=147 MB (1547 B/conn) | client_rss=4 MB | system_delta=796 MB | kernel_est=3376 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3728533 rps=1242817 | lat_us p50=54 p90=63 p99=71 p999=77 max=501 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=774 MB
+-- Go pipe conc=0 (GOMAXPROCS=4)
+N=100000 srcips=9 | server_rss_delta=377 MB (3958 B/conn) | client_rss=4 MB | system_delta=1042 MB | kernel_est=3459 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3362057 rps=1120659 | lat_us p50=48 p90=108 p99=162 p999=194 max=555 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=1001 MB
+-- Go pipe conc=1 (GOMAXPROCS=4)
+N=100000 srcips=9 | server_rss_delta=515 MB (5401 B/conn) | client_rss=4 MB | system_delta=1200 MB | kernel_est=3567 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3205101 rps=1068344 | lat_us p50=50 p90=114 p99=174 p999=219 max=12943 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=1018 MB
+-- Go net/http (GOMAXPROCS=4)
+N=100000 srcips=9 | server_rss_delta=3177 MB (33321 B/conn) | client_rss=4 MB | system_delta=3837 MB | kernel_est=3433 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=1759992 rps=586651 | lat_us p50=86 p90=225 p99=371 p999=504 max=13158 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=2549 MB

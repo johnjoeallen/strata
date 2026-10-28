@@ -1,0 +1,50 @@
+// redis/reply.stra - writes replies. Original: connection.rs write_frame/write_value over a BufWriter, flushed after every frame.
+// The same here, stated: bytes go into one pooled OutBuf, `flush()` sends them, and every command handler ends its reply with flush().
+// Nothing is held back across replies. The buffer is taken from the pool when a reply starts and returned when it is flushed, so an idle
+// connection owns none (design: no memory held while waiting).
+import runtime.leaves
+import runtime.io
+import redis.types
+
+struct Writer {
+    conn: Conn&
+    out: OutBuf? = null
+    used: usize = 0
+
+    static fn of(conn: Conn&): Writer { return Writer { conn: conn } }
+
+    fn simple(text: string)  throws IoError { put("+"); put(text); put("\r\n") }
+    fn error(text: string)   throws IoError { put("-"); put(text); put("\r\n") }
+    fn integer(v: u64)       throws IoError { put(":"); putDecimal(v) }
+    fn nullBulk()            throws IoError { put("$-1\r\n") }
+    fn arrayHeader(n: usize) throws IoError { put("*"); putDecimal(n as u64) }
+
+    // A bulk string. Small ones are copied into the buffer; one that does not fit is sent from where it is (after the buffered header), no copy.
+    fn bulk(bytes: u8[]&) throws IoError {
+        put("$"); putDecimal(bytes.length as u64)
+        if (bytes.length <= OUTSZ - used) { put(bytes) }
+        else { flush(); writeAll(conn, bytes) }          // parks while the client is slow
+        put("\r\n")
+    }
+
+    // Sends what has been written and gives the buffer back. Parks if the socket is full.
+    fn flush() throws IoError {
+        if (out == null) return
+        writeAll(conn, out.data[0..used])
+        self.out = null                                  // back to the pool
+        self.used = 0
+    }
+
+    fn put(bytes: u8[]&) throws IoError {
+        var rest = bytes
+        while (rest.length > 0) {
+            if (out == null) self.out = outPool.get()
+            if (used == OUTSZ) { flush(); continue }     // full: send it (a long reply goes out in several writes, as the HTTP server's does)
+            let n = min(rest.length, OUTSZ - used)
+            out.data[used..used + n].copyFrom(rest[0..n])
+            self.used += n
+            rest = rest[n..]
+        }
+    }
+    fn putDecimal(v: u64) throws IoError { put(decimalText(v)); put("\r\n") }
+}

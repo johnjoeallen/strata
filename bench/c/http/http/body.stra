@@ -1,0 +1,168 @@
+// http/body.stra - request bodies: the framing decoder (Content-Length, chunked), the two sinks, and the Body / Upload types.
+// C counterpart: http/http_body.h (Body, body_framing, body_feed, sink_write, body_free).
+import runtime.leaves
+import http.types
+
+// ---------- request bodies ----------
+// Both readers decode the body as a STREAM through the connection's input buffer (Content-Length and chunked alike), enforce the limit as
+// the bytes arrive, and hand the payload to a Sink: memory for the standard reader, an unnamed temporary file for the upload reader. They
+// differ only in the sink, the limit and what the handler receives. server.c: Body, body_framing, body_feed, sink_write, and the body branch
+// of conc_step. In a switch on a mutable value, a binding refers to the payload in place (so `Spool(f) -> { f = ... }` updates the enum).
+enum ChunkState {
+    Size(usize)              // reading hex digits; the payload is how many have been read
+    Ext                      // skipping a chunk extension up to the CRLF
+    SizeLf                   // saw the CR after the size
+    Data(u64)                // payload bytes left in this chunk
+    DataCr
+    DataLf
+    TrailerStart
+    TrailerLine
+    TrailerEndLf
+}
+
+enum Framing {
+    NoBody
+    Fixed(u64)               // Content-Length: bytes still to come
+    Chunked(ChunkState)
+
+    fn isNoBody(): bool {
+        switch (self) {
+            NoBody -> { return true }
+            Fixed(_), Chunked(_) -> { return false }
+        }
+    }
+
+    // Reads the headers. Throws BadBody for Content-Length together with Transfer-Encoding: chunked, or a repeated or non-numeric Content-Length.
+    static fn parse(head: u8[]&): Framing throws BadBody {
+        var length: u64? = null
+        var chunked = false
+        for (line in head.lines().skip(1)) {
+            if (line.startsWithIgnoreCase("content-length:")) {
+                if (length != null) throw BadBody()
+                length = line[15..].trim().toU64()   // null if it is not a plain number
+                if (length == null) throw BadBody()
+            } else if (line.startsWithIgnoreCase("transfer-encoding:") && line.containsIgnoreCase("chunked")) {
+                chunked = true
+            }
+        }
+        if (chunked && length != null) throw BadBody()
+        if (chunked) return Framing.Chunked(ChunkState.Size(0))
+        if (length != null) return Framing.Fixed(length)
+        return Framing.NoBody
+    }
+}
+
+// Where the payload goes.
+enum Sink {
+    Memory(u8[])             // the standard reader: appended to an array that grows as needed (bounded by the limit the decoder enforces)
+    Spool(File?)             // the upload reader: an unnamed temporary file, created at the first byte
+
+    fn write(bytes: u8[]&, dir: string) throws IoError {   // (the file write is offloaded blocking I/O)
+        switch (self) {
+            Memory(data) -> { data.append(bytes) }
+            Spool(f)     -> {
+                if (f == null) f = File.openTemp(dir)   // no name: deleted when closed
+                f.write(bytes)
+            }
+        }
+    }
+}
+
+struct BodyDecoder {
+    framing: Framing
+    limit: u64               // refuse more than this many payload bytes
+    total: u64 = 0           // payload bytes delivered so far
+    chunk: u64 = 0           // the size of the chunk being read
+    trailer: usize = 0       // trailer bytes seen (capped)
+    digest: Crc32 = Crc32()
+    done: bool = false
+
+    static fn of(framing: Framing, limit: u64): BodyDecoder {
+        return BodyDecoder { framing: framing, limit: limit, done: framing == Framing.Fixed(0) }
+    }
+
+    fn deliver(bytes: u8[]&, sink: Sink&, dir: string) throws IoError {
+        digest.update(bytes)
+        self.total += bytes.length
+        sink.write(bytes, dir)
+    }
+
+    // Feeds the next bytes of the connection's input. Payload bytes go to `sink`; returns how many input bytes it consumed. It stops at the
+    // end of the body, so a pipelined request behind it is left alone.
+    fn feed(input: u8[]&, sink: Sink&, dir: string): usize throws BadBody, PayloadTooLarge, IoError {
+        var i = 0
+        switch (framing) {
+            NoBody -> { self.done = true }
+            Fixed(left) -> {
+                let take = min(left, input.length)
+                deliver(input[0..take], sink, dir)
+                self.framing = Framing.Fixed(left - take)
+                if (left == take) self.done = true
+                i = take
+            }
+            Chunked(state) -> {
+                var st = state
+                while (i < input.length && !done) {
+                    let c = input[i]
+                    switch (st) {
+                        Size(digits) -> {
+                            let h = hexValue(c)   // -1 if c is not a hex digit
+                            if (h >= 0) {
+                                if (digits >= 16) throw BadBody()
+                                self.chunk = chunk * 16 + h; st = ChunkState.Size(digits + 1); i++
+                            } else if (c == ';' && digits > 0) { st = ChunkState.Ext; i++ }
+                            else if (c == '\r' && digits > 0) { st = ChunkState.SizeLf; i++ }
+                            else throw BadBody()
+                        }
+                        Ext -> { if (c == '\n') throw BadBody(); if (c == '\r') st = ChunkState.SizeLf; i++ }
+                        SizeLf -> {
+                            if (c != '\n') throw BadBody()
+                            i++
+                            if (chunk == 0) { st = ChunkState.TrailerStart }
+                            else {
+                                if (chunk > limit || total + chunk > limit) throw PayloadTooLarge()    // enforced as the chunk header arrives
+                                st = ChunkState.Data(chunk)
+                            }
+                        }
+                        Data(left) -> {
+                            let take = min(left, input.length - i)
+                            deliver(input[i .. i + take], sink, dir)
+                            i += take
+                            st = (left == take) ? ChunkState.DataCr : ChunkState.Data(left - take)
+                        }
+                        DataCr -> { if (c != '\r') throw BadBody(); i++; st = ChunkState.DataLf }
+                        DataLf -> { if (c != '\n') throw BadBody(); i++; st = ChunkState.Size(0); self.chunk = 0 }
+                        TrailerStart -> { if (c == '\r') { st = ChunkState.TrailerEndLf; i++ } else st = ChunkState.TrailerLine }
+                        TrailerLine -> { self.trailer++; if (trailer > 8192) throw BadBody(); if (c == '\n') st = ChunkState.TrailerStart; i++ }
+                        TrailerEndLf -> { if (c != '\n') throw BadBody(); i++; self.done = true }
+                    }
+                }
+                self.framing = Framing.Chunked(st)
+            }
+        }
+        return i
+    }
+}
+
+// What the STANDARD reader hands a handler: the whole body, in memory. Never more than ServerConfig.maxBody.
+struct Body {
+    data: u8[]
+    digest: u32
+
+    fn bytes(): u8[]& { return data[0..data.length] }
+    fn length(): u64 { return data.length }
+    fn digest(): u32 { return digest }
+}
+
+// What the UPLOAD reader hands a handler: the finished body as an unnamed temporary file. Dropping the Upload deletes the file; to keep it,
+// link it into place first (file().linkAs(path)).
+struct Upload {
+    spool: File
+    length: u64
+    digest: u32
+
+    fn file(): File& { return spool }   // read it, link it into place, or map it
+    fn map(): Mapping throws IoError { return spool.map() }   // an explicit read-only mmap; unmapped when dropped
+    fn length(): u64 { return length }
+    fn digest(): u32 { return digest }
+}

@@ -1,0 +1,100 @@
+mode=owned   threads= 1 remote=0.00    533.0 Mpairs/s (533.0 per thread)  rss=1 MB  objects_carved=1024
+mode=owned   threads= 1 remote=0.10    536.4 Mpairs/s (536.4 per thread)  rss=1 MB  objects_carved=1024
+mode=owned   threads= 1 remote=0.50    533.8 Mpairs/s (533.8 per thread)  rss=1 MB  objects_carved=1024
+mode=owned   threads= 1 remote=1.00    537.9 Mpairs/s (537.9 per thread)  rss=1 MB  objects_carved=1024
+mode=owned   threads= 2 remote=0.00    833.3 Mpairs/s (416.7 per thread)  rss=1 MB  objects_carved=2048
+mode=owned   threads= 2 remote=0.10    239.4 Mpairs/s (119.7 per thread)  rss=2 MB  objects_carved=4096
+mode=owned   threads= 2 remote=0.50     93.0 Mpairs/s ( 46.5 per thread)  rss=2 MB  objects_carved=7168
+mode=owned   threads= 2 remote=1.00     58.8 Mpairs/s ( 29.4 per thread)  rss=2 MB  objects_carved=11264
+mode=owned   threads= 4 remote=0.00   1598.9 Mpairs/s (399.7 per thread)  rss=1 MB  objects_carved=4096
+mode=owned   threads= 4 remote=0.10    492.7 Mpairs/s (123.2 per thread)  rss=2 MB  objects_carved=14336
+mode=owned   threads= 4 remote=0.50    193.2 Mpairs/s ( 48.3 per thread)  rss=2 MB  objects_carved=15360
+mode=owned   threads= 4 remote=1.00    141.9 Mpairs/s ( 35.5 per thread)  rss=3 MB  objects_carved=26624
+mode=owned   threads= 8 remote=0.00   3109.3 Mpairs/s (388.7 per thread)  rss=2 MB  objects_carved=8192
+mode=owned   threads= 8 remote=0.10    998.2 Mpairs/s (124.8 per thread)  rss=2 MB  objects_carved=9216
+mode=owned   threads= 8 remote=0.50    369.6 Mpairs/s ( 46.2 per thread)  rss=3 MB  objects_carved=33792
+mode=owned   threads= 8 remote=1.00    273.8 Mpairs/s ( 34.2 per thread)  rss=5 MB  objects_carved=55296
+mode=owned   threads=16 remote=0.00   4728.6 Mpairs/s (295.5 per thread)  rss=1 MB  objects_carved=16384
+mode=owned   threads=16 remote=0.10   1732.6 Mpairs/s (108.3 per thread)  rss=2 MB  objects_carved=20480
+mode=owned   threads=16 remote=0.50    679.1 Mpairs/s ( 42.4 per thread)  rss=2 MB  objects_carved=23552
+mode=owned   threads=16 remote=1.00    455.3 Mpairs/s ( 28.5 per thread)  rss=4 MB  objects_carved=50176
+mode=owned_b threads= 1 remote=0.00    501.8 Mpairs/s (501.8 per thread)  rss=1 MB  objects_carved=1024
+mode=owned_b threads= 1 remote=0.10    495.9 Mpairs/s (495.9 per thread)  rss=1 MB  objects_carved=1024
+mode=owned_b threads= 1 remote=0.50    502.1 Mpairs/s (502.1 per thread)  rss=1 MB  objects_carved=1024
+mode=owned_b threads= 1 remote=1.00    495.1 Mpairs/s (495.1 per thread)  rss=1 MB  objects_carved=1024
+mode=owned_b threads= 2 remote=0.00    814.6 Mpairs/s (407.3 per thread)  rss=1 MB  objects_carved=2048
+mode=owned_b threads= 2 remote=0.10    262.3 Mpairs/s (131.2 per thread)  rss=2 MB  objects_carved=8192
+mode=owned_b threads= 2 remote=0.50    110.9 Mpairs/s ( 55.4 per thread)  rss=2 MB  objects_carved=7168
+mode=owned_b threads= 2 remote=1.00     85.2 Mpairs/s ( 42.6 per thread)  rss=2 MB  objects_carved=12288
+mode=owned_b threads= 4 remote=0.00   1499.3 Mpairs/s (374.8 per thread)  rss=1 MB  objects_carved=4096
+mode=owned_b threads= 4 remote=0.10    515.4 Mpairs/s (128.8 per thread)  rss=2 MB  objects_carved=9216
+mode=owned_b threads= 4 remote=0.50    243.7 Mpairs/s ( 60.9 per thread)  rss=2 MB  objects_carved=10240
+mode=owned_b threads= 4 remote=1.00    199.9 Mpairs/s ( 50.0 per thread)  rss=2 MB  objects_carved=18432
+mode=owned_b threads= 8 remote=0.00   3280.4 Mpairs/s (410.1 per thread)  rss=1 MB  objects_carved=8192
+mode=owned_b threads= 8 remote=0.10   1078.2 Mpairs/s (134.8 per thread)  rss=2 MB  objects_carved=10240
+mode=owned_b threads= 8 remote=0.50    418.2 Mpairs/s ( 52.3 per thread)  rss=2 MB  objects_carved=15360
+mode=owned_b threads= 8 remote=1.00    355.8 Mpairs/s ( 44.5 per thread)  rss=2 MB  objects_carved=19456
+mode=owned_b threads=16 remote=0.00   5684.6 Mpairs/s (355.3 per thread)  rss=1 MB  objects_carved=16384
+mode=owned_b threads=16 remote=0.10   1887.0 Mpairs/s (117.9 per thread)  rss=2 MB  objects_carved=18432
+mode=owned_b threads=16 remote=0.50    739.9 Mpairs/s ( 46.2 per thread)  rss=2 MB  objects_carved=19456
+mode=owned_b threads=16 remote=1.00    601.3 Mpairs/s ( 37.6 per thread)  rss=3 MB  objects_carved=30720
+mode=mutex   threads= 1 remote=0.00     57.6 Mpairs/s ( 57.6 per thread)  rss=1 MB  objects_carved=32
+mode=mutex   threads= 1 remote=0.10     57.5 Mpairs/s ( 57.5 per thread)  rss=1 MB  objects_carved=32
+mode=mutex   threads= 1 remote=0.50     57.6 Mpairs/s ( 57.6 per thread)  rss=1 MB  objects_carved=32
+mode=mutex   threads= 1 remote=1.00     57.5 Mpairs/s ( 57.5 per thread)  rss=1 MB  objects_carved=32
+mode=mutex   threads= 2 remote=0.00     13.7 Mpairs/s (  6.9 per thread)  rss=1 MB  objects_carved=64
+mode=mutex   threads= 2 remote=0.10     13.2 Mpairs/s (  6.6 per thread)  rss=1 MB  objects_carved=681
+mode=mutex   threads= 2 remote=0.50     13.2 Mpairs/s (  6.6 per thread)  rss=2 MB  objects_carved=3053
+mode=mutex   threads= 2 remote=1.00     12.6 Mpairs/s (  6.3 per thread)  rss=2 MB  objects_carved=7775
+mode=mutex   threads= 4 remote=0.00     11.1 Mpairs/s (  2.8 per thread)  rss=2 MB  objects_carved=128
+mode=mutex   threads= 4 remote=0.10     10.9 Mpairs/s (  2.7 per thread)  rss=1 MB  objects_carved=868
+mode=mutex   threads= 4 remote=0.50     10.1 Mpairs/s (  2.5 per thread)  rss=2 MB  objects_carved=2746
+mode=mutex   threads= 4 remote=1.00     10.3 Mpairs/s (  2.6 per thread)  rss=2 MB  objects_carved=1011
+mode=mutex   threads= 8 remote=0.00     10.4 Mpairs/s (  1.3 per thread)  rss=1 MB  objects_carved=246
+mode=mutex   threads= 8 remote=0.10     10.1 Mpairs/s (  1.3 per thread)  rss=1 MB  objects_carved=286
+mode=mutex   threads= 8 remote=0.50      9.6 Mpairs/s (  1.2 per thread)  rss=1 MB  objects_carved=521
+mode=mutex   threads= 8 remote=1.00     10.2 Mpairs/s (  1.3 per thread)  rss=1 MB  objects_carved=1089
+mode=mutex   threads=16 remote=0.00      5.6 Mpairs/s (  0.3 per thread)  rss=1 MB  objects_carved=429
+mode=mutex   threads=16 remote=0.10      5.4 Mpairs/s (  0.3 per thread)  rss=1 MB  objects_carved=450
+mode=mutex   threads=16 remote=0.50      5.1 Mpairs/s (  0.3 per thread)  rss=1 MB  objects_carved=715
+mode=mutex   threads=16 remote=1.00      4.8 Mpairs/s (  0.3 per thread)  rss=2 MB  objects_carved=1543
+mode=lfstack threads= 1 remote=0.00    120.9 Mpairs/s (120.9 per thread)  rss=1 MB  objects_carved=32
+mode=lfstack threads= 1 remote=0.10    120.7 Mpairs/s (120.7 per thread)  rss=1 MB  objects_carved=32
+mode=lfstack threads= 1 remote=0.50    121.0 Mpairs/s (121.0 per thread)  rss=1 MB  objects_carved=32
+mode=lfstack threads= 1 remote=1.00    120.9 Mpairs/s (120.9 per thread)  rss=1 MB  objects_carved=32
+mode=lfstack threads= 2 remote=0.00     18.8 Mpairs/s (  9.4 per thread)  rss=1 MB  objects_carved=64
+mode=lfstack threads= 2 remote=0.10     19.5 Mpairs/s (  9.7 per thread)  rss=1 MB  objects_carved=1208
+mode=lfstack threads= 2 remote=0.50     18.8 Mpairs/s (  9.4 per thread)  rss=2 MB  objects_carved=4500
+mode=lfstack threads= 2 remote=1.00     19.4 Mpairs/s (  9.7 per thread)  rss=2 MB  objects_carved=8240
+mode=lfstack threads= 4 remote=0.00     11.8 Mpairs/s (  3.0 per thread)  rss=1 MB  objects_carved=128
+mode=lfstack threads= 4 remote=0.10     12.1 Mpairs/s (  3.0 per thread)  rss=1 MB  objects_carved=177
+mode=lfstack threads= 4 remote=0.50     11.8 Mpairs/s (  3.0 per thread)  rss=1 MB  objects_carved=446
+mode=lfstack threads= 4 remote=1.00     11.8 Mpairs/s (  3.0 per thread)  rss=1 MB  objects_carved=1344
+mode=lfstack threads= 8 remote=0.00      7.0 Mpairs/s (  0.9 per thread)  rss=1 MB  objects_carved=250
+mode=lfstack threads= 8 remote=0.10      7.2 Mpairs/s (  0.9 per thread)  rss=1 MB  objects_carved=261
+mode=lfstack threads= 8 remote=0.50      6.8 Mpairs/s (  0.9 per thread)  rss=1 MB  objects_carved=1029
+mode=lfstack threads= 8 remote=1.00      6.8 Mpairs/s (  0.8 per thread)  rss=2 MB  objects_carved=1233
+mode=lfstack threads=16 remote=0.00      4.4 Mpairs/s (  0.3 per thread)  rss=2 MB  objects_carved=437
+mode=lfstack threads=16 remote=0.10      4.5 Mpairs/s (  0.3 per thread)  rss=1 MB  objects_carved=455
+mode=lfstack threads=16 remote=0.50      4.4 Mpairs/s (  0.3 per thread)  rss=1 MB  objects_carved=589
+mode=lfstack threads=16 remote=1.00      4.3 Mpairs/s (  0.3 per thread)  rss=2 MB  objects_carved=1998
+mode=glibc   threads= 1 remote=0.00     80.6 Mpairs/s ( 80.6 per thread)  rss=1 MB  objects_carved=0
+mode=glibc   threads= 1 remote=0.10     82.7 Mpairs/s ( 82.7 per thread)  rss=1 MB  objects_carved=0
+mode=glibc   threads= 1 remote=0.50     85.5 Mpairs/s ( 85.5 per thread)  rss=1 MB  objects_carved=0
+mode=glibc   threads= 1 remote=1.00     85.8 Mpairs/s ( 85.8 per thread)  rss=1 MB  objects_carved=0
+mode=glibc   threads= 2 remote=0.00    162.8 Mpairs/s ( 81.4 per thread)  rss=1 MB  objects_carved=0
+mode=glibc   threads= 2 remote=0.10     80.5 Mpairs/s ( 40.3 per thread)  rss=1 MB  objects_carved=0
+mode=glibc   threads= 2 remote=0.50     43.4 Mpairs/s ( 21.7 per thread)  rss=2 MB  objects_carved=0
+mode=glibc   threads= 2 remote=1.00     33.6 Mpairs/s ( 16.8 per thread)  rss=2 MB  objects_carved=0
+mode=glibc   threads= 4 remote=0.00    311.3 Mpairs/s ( 77.8 per thread)  rss=1 MB  objects_carved=0
+mode=glibc   threads= 4 remote=0.10    161.8 Mpairs/s ( 40.5 per thread)  rss=2 MB  objects_carved=0
+mode=glibc   threads= 4 remote=0.50     91.1 Mpairs/s ( 22.8 per thread)  rss=2 MB  objects_carved=0
+mode=glibc   threads= 4 remote=1.00     74.7 Mpairs/s ( 18.7 per thread)  rss=2 MB  objects_carved=0
+mode=glibc   threads= 8 remote=0.00    622.5 Mpairs/s ( 77.8 per thread)  rss=1 MB  objects_carved=0
+mode=glibc   threads= 8 remote=0.10    304.5 Mpairs/s ( 38.1 per thread)  rss=2 MB  objects_carved=0
+mode=glibc   threads= 8 remote=0.50    181.8 Mpairs/s ( 22.7 per thread)  rss=2 MB  objects_carved=0
+mode=glibc   threads= 8 remote=1.00    139.2 Mpairs/s ( 17.4 per thread)  rss=3 MB  objects_carved=0
+mode=glibc   threads=16 remote=0.00   1185.9 Mpairs/s ( 74.1 per thread)  rss=2 MB  objects_carved=0
+mode=glibc   threads=16 remote=0.10    596.7 Mpairs/s ( 37.3 per thread)  rss=2 MB  objects_carved=0
+mode=glibc   threads=16 remote=0.50    347.4 Mpairs/s ( 21.7 per thread)  rss=3 MB  objects_carved=0
+mode=glibc   threads=16 remote=1.00    256.6 Mpairs/s ( 16.0 per thread)  rss=3 MB  objects_carved=0

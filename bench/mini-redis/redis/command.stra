@@ -1,0 +1,102 @@
+// redis/command.stra - the commands. Original: cmd/mod.rs (Command enum + from_frame), cmd/get.rs, set.rs, publish.rs, ping.rs, unknown.rs, and the
+// parsing half of subscribe.rs. Arguments are BORROWED views into the reader's buffer; they are valid until Reader.finish(). Whatever the
+// database keeps is copied by the database, once.
+import redis.types
+import redis.limits
+import redis.connection
+
+enum Command {
+    Get(key: u8[]&)
+    Set(key: u8[]&, value: u8[]&, expire: Duration?)
+    Publish(channel: u8[]&, message: u8[]&)
+    Subscribe(first: usize)                              // channel names are Args items first..count
+    Unsubscribe(first: usize)                            // none given: all
+    Ping(message: u8[]?)
+    Unknown(name: u8[]&)
+
+    fn name(): string {                                  // original: Command::get_name
+        switch (self) {
+            Get(_) -> { return "get" }
+            Set(_, _, _) -> { return "set" }
+            Publish(_, _) -> { return "publish" }
+            Subscribe(_) -> { return "subscribe" }
+            Unsubscribe(_) -> { return "unsubscribe" }
+            Ping(_) -> { return "ping" }
+            Unknown(n) -> { return n.toString() }
+        }
+    }
+
+    // The command in `r.frame()`. Wrong shapes are ProtocolErrors (the original: EndOfStream or "expected end of frame" errors that end the connection).
+    static fn parse(r: Reader&, lim: Limits&): Command throws ProtocolError {
+        let a = r.frame()
+        let name = text(r, 0)
+        if (name.equalsIgnoreCase("get")) {
+            expectCount(a, 2)
+            return Command.Get(key(r, 1, lim))
+        } else if (name.equalsIgnoreCase("set")) {
+            if (a.count != 3 && a.count != 5) throw ProtocolError("protocol error; wrong number of arguments for `SET`")
+            var expire: Duration? = null
+            if (a.count == 5) {
+                let opt = text(r, 3)
+                let n = number(r, 4)
+                if (opt.equalsIgnoreCase("ex")) {
+                    if (n == 0 || n > lim.maxExpireSecs) throw ProtocolError("invalid expire time in 'set' command")
+                    expire = Duration.seconds(n)
+                } else if (opt.equalsIgnoreCase("px")) {
+                    if (n == 0 || n > lim.maxExpireSecs * 1000) throw ProtocolError("invalid expire time in 'set' command")
+                    expire = Duration.millis(n)
+                } else throw ProtocolError("currently `SET` only supports the expiration option")
+            }
+            return Command.Set(key(r, 1, lim), blob(r, 2), expire)
+        } else if (name.equalsIgnoreCase("publish")) {
+            expectCount(a, 3)
+            return Command.Publish(key(r, 1, lim), blob(r, 2))
+        } else if (name.equalsIgnoreCase("subscribe")) {
+            if (a.count < 2) throw ProtocolError("protocol error; SUBSCRIBE needs a channel")
+            for (i in 1..a.count) key(r, i, lim)         // validate now, so the loop later cannot fail half way
+            return Command.Subscribe(1)
+        } else if (name.equalsIgnoreCase("unsubscribe")) {
+            for (i in 1..a.count) key(r, i, lim)
+            return Command.Unsubscribe(1)
+        } else if (name.equalsIgnoreCase("ping")) {
+            if (a.count > 2) throw ProtocolError("protocol error; expected end of frame, but there was more")
+            return Command.Ping(a.count == 2 ? blob(r, 1) : null)
+        }
+        return Command.Unknown(name)
+    }
+}
+
+fn expectCount(a: Args&, n: usize) throws ProtocolError {
+    if (a.count != n) throw ProtocolError("protocol error; wrong number of arguments")
+}
+
+// An argument as bytes: simple or bulk (the original's next_bytes).
+fn blob(r: Reader&, i: usize): u8[]& throws ProtocolError {
+    let arg = r.frame().items[i]
+    switch (arg.kind) {
+        Simple, Bulk -> { return r.bytes(arg) }
+        Integer, Null -> { throw ProtocolError("protocol error; expected simple frame or bulk frame") }
+    }
+}
+
+// A command name or key: bytes that must be valid UTF-8 (the original's next_string), and at most maxKey long when it is a key.
+fn text(r: Reader&, i: usize): u8[]& throws ProtocolError {
+    let b = blob(r, i)
+    if (!b.isUtf8()) throw ProtocolError("protocol error; invalid string")
+    return b
+}
+fn key(r: Reader&, i: usize, lim: Limits&): u8[]& throws ProtocolError {
+    let b = text(r, i)
+    if (b.length > lim.maxKey) throw ProtocolError("protocol error; key too long")
+    return b
+}
+
+// An integer argument: an integer element, or digits in a simple/bulk one (the original's next_int).
+fn number(r: Reader&, i: usize): u64 throws ProtocolError {
+    let arg = r.frame().items[i]
+    switch (arg.kind) {
+        Integer -> { return arg.number }
+        Simple, Bulk -> { return parseDecimal(r.bytes(arg)) }
+        Null -> { throw ProtocolError("protocol error; invalid number") }
+    }
+}

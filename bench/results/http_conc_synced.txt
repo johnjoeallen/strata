@@ -1,0 +1,36 @@
+## AFTER syncing server.c with server.stra (head copy per spawned child, 431, 500 path, status-code responses)
+## instant handlers, 1 worker, 16 conns, K=16 pipelined
+sequential (flush each)        conns=16 K=16 | rps=444306 | first_resp_us mean=545 max=4221 | batch_done p50=550 | err connect=0 io=0 partial=0
+concurrent, inline fast path   conns=16 K=16 | rps=3943124 | first_resp_us mean=64 max=4147 | batch_done p50=62 | err connect=0 io=0 partial=0
+concurrent, always spawn       conns=16 K=16 | rps=4012727 | first_resp_us mean=63 max=3325 | batch_done p50=62 | err connect=0 io=0 partial=0
+sequential (flush each)        conns=16 K=16 | rps=444582 | first_resp_us mean=544 max=6858 | batch_done p50=549 | err connect=0 io=0 partial=0
+concurrent, inline fast path   conns=16 K=16 | rps=3941378 | first_resp_us mean=64 max=5134 | batch_done p50=63 | err connect=0 io=0 partial=0
+concurrent, always spawn       conns=16 K=16 | rps=4000505 | first_resp_us mean=63 max=4630 | batch_done p50=62 | err connect=0 io=0 partial=0
+sequential (flush each)        conns=16 K=16 | rps=445383 | first_resp_us mean=543 max=5164 | batch_done p50=547 | err connect=0 io=0 partial=0
+concurrent, inline fast path   conns=16 K=16 | rps=3995381 | first_resp_us mean=64 max=5751 | batch_done p50=62 | err connect=0 io=0 partial=0
+concurrent, always spawn       conns=16 K=16 | rps=4038363 | first_resp_us mean=63 max=2746 | batch_done p50=62 | err connect=0 io=0 partial=0
+## no pipelining (K=1)
+sequential                     conns=16 K=1 | rps=299567 | first_resp_us mean=0 max=0 | batch_done p50=51 | err connect=0 io=0 partial=0
+concurrent, inline fast path   conns=16 K=1 | rps=296049 | first_resp_us mean=0 max=0 | batch_done p50=52 | err connect=0 io=0 partial=0
+concurrent, always spawn       conns=16 K=1 | rps=290683 | first_resp_us mean=0 max=0 | batch_done p50=53 | err connect=0 io=0 partial=0
+sequential                     conns=16 K=1 | rps=294765 | first_resp_us mean=0 max=0 | batch_done p50=52 | err connect=0 io=0 partial=0
+concurrent, inline fast path   conns=16 K=1 | rps=287641 | first_resp_us mean=0 max=0 | batch_done p50=53 | err connect=0 io=0 partial=0
+concurrent, always spawn       conns=16 K=1 | rps=285689 | first_resp_us mean=0 max=0 | batch_done p50=54 | err connect=0 io=0 partial=0
+## parking handlers (200 us), K=16
+sequential                     conns=1 K=16 | rps=3893 | first_resp_us mean=266 max=1346 | batch_done p50=4087 | err connect=0 io=0 partial=0
+concurrent depth=16            conns=1 K=16 | rps=58969 | first_resp_us mean=271 max=6148 | batch_done p50=265 | err connect=0 io=0 partial=0
+sequential                     conns=16 K=16 | rps=62249 | first_resp_us mean=279 max=442 | batch_done p50=4112 | err connect=0 io=0 partial=0
+concurrent depth=16            conns=16 K=16 | rps=788986 | first_resp_us mean=324 max=3865 | batch_done p50=322 | err connect=0 io=0 partial=0
+## one slow CPU request (GET /slow, ~1 ms) at position 9 of 16; one unloaded connection
+server_seq                               | first_resp_us mean=13 max=471 | batch_done p50=945
+server conc=1 depth=16 classify=0        | first_resp_us mean=948 max=4759 | batch_done p50=917
+server conc=1 depth=16 classify=1        | first_resp_us mean=10 max=61 | batch_done p50=921
+## idle memory per connection, 100k connections, 4 workers
+-- server conc=0
+N=100000 srcips=9 | server_rss_delta=8 MB (88 B/conn) | client_rss=4 MB | system_delta=649 MB | kernel_est=3334 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3687761 rps=1229225 | lat_us p50=44 p90=79 p99=101 p999=118 max=2509 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | clien
+-- server conc=1
+N=100000 srcips=9 | server_rss_delta=16 MB (169 B/conn) | client_rss=4 MB | system_delta=598 MB | kernel_est=3028 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3674423 rps=1224781 | lat_us p50=50 p90=71 p99=98 p999=115 max=406 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_
+server: port=18080 workers=1 conc=1 depth=16 sizeof(ConnTask)=88 sizeof(CConn)=168 sizeof(Req)=104 sizeof(Buf)=2048
+server: port=18081 workers=1 conc=1 depth=16 sizeof(ConnTask)=88 sizeof(CConn)=168 sizeof(Req)=104 sizeof(Buf)=2048

@@ -1,0 +1,62 @@
+# mini-redis (Strata/C) benchmarks, 2026-10-28, server cores 0.., loadgen cores 8..
+## GET/SET 90/10, 16-byte values, 10000 keys: ops/s and batch latency (one batch = pipe commands, each answered separately)
+workers=1 mode=getset conns=16 subs=0 pipe=1 vsize=16 threads=1: ops/s=328163 batch_lat_us p50=48 p99=53 max=142 errors=0
+workers=1 mode=getset conns=16 subs=0 pipe=16 vsize=16 threads=1: ops/s=467828 batch_lat_us p50=548 p99=765 max=907 errors=0
+workers=1 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=1: ops/s=335006 batch_lat_us p50=189 p99=206 max=296 errors=0
+workers=4 mode=getset conns=16 subs=0 pipe=1 vsize=16 threads=4: ops/s=1004415 batch_lat_us p50=13 p99=32 max=3626 errors=0
+workers=4 mode=getset conns=16 subs=0 pipe=16 vsize=16 threads=4: ops/s=1262528 batch_lat_us p50=206 p99=293 max=3573 errors=0
+workers=4 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=563110 batch_lat_us p50=113 p99=170 max=6251 errors=0
+## values: SET/GET 90/10 with larger values, 1 worker, 16 conns, pipe=1
+mode=getset conns=16 subs=0 pipe=1 vsize=16 threads=1: ops/s=327168 batch_lat_us p50=48 p99=69 max=239 errors=0
+mode=getset conns=16 subs=0 pipe=1 vsize=256 threads=1: ops/s=329287 batch_lat_us p50=48 p99=53 max=173 errors=0
+mode=getset conns=16 subs=0 pipe=1 vsize=4096 threads=1: ops/s=292097 batch_lat_us p50=54 p99=63 max=171 errors=0
+mode=getset conns=16 subs=0 pipe=1 vsize=65536 threads=1: ops/s=92378 batch_lat_us p50=177 p99=224 max=1047 errors=0
+## pub/sub fan-out, saturated: 4 closed-loop publishers, vsize=64, 1 channel (ops/s = publishes/s; latency here is queue-fill time, not meaningful)
+workers=1 mode=pubsub conns=4 subs=1 pipe=1 vsize=64 threads=1: ops/s=206547 batch_lat_us p50=18 p99=23 max=243 deliveries/s=206547 deliver_lat_us p50=26 p99=32 max=254 errors=0
+workers=1 mode=pubsub conns=4 subs=16 pipe=1 vsize=64 threads=1: ops/s=27468 batch_lat_us p50=142 p99=219 max=396 deliveries/s=439480 deliver_lat_us p50=189 p99=277 max=493 errors=0
+workers=1 mode=pubsub conns=4 subs=64 pipe=1 vsize=64 threads=1: ops/s=7130 batch_lat_us p50=542 p99=867 max=2061 deliveries/s=456336 deliver_lat_us p50=732 p99=1218 max=2332 errors=0
+workers=1 mode=pubsub conns=4 subs=256 pipe=1 vsize=64 threads=1: ops/s=1735 batch_lat_us p50=1754 p99=3488 max=5785 deliveries/s=444226 deliver_lat_us p50=3020 p99=5116 max=7502 errors=0
+workers=4 mode=pubsub conns=4 subs=1 pipe=1 vsize=64 threads=4: ops/s=405661 batch_lat_us p50=9 p99=15 max=5213 deliveries/s=405662 deliver_lat_us p50=13 p99=18 max=955 errors=0
+workers=4 mode=pubsub conns=4 subs=16 pipe=1 vsize=64 threads=4: ops/s=203390 batch_lat_us p50=9 p99=239 max=3330 deliveries/s=1083115 deliver_lat_us p50=18 p99=50000 max=396742 errors=11
+workers=4 mode=pubsub conns=4 subs=64 pipe=1 vsize=64 threads=4: ops/s=20657 batch_lat_us p50=192 p99=291 max=4999 deliveries/s=1276522 deliver_lat_us p50=281 p99=50000 max=403773 errors=0
+workers=4 mode=pubsub conns=4 subs=256 pipe=1 vsize=64 threads=4: ops/s=7744 batch_lat_us p50=267 p99=3815 max=5209 deliveries/s=1982494 deliver_lat_us p50=810 p99=5911 max=10207 errors=0
+## pub/sub delivery latency at a fixed load: 4 paced publishers, vsize=64, rate = min(10000, 200000/subs) publishes/s so deliveries stay near 200k/s
+workers=1 mode=pubsub conns=4 subs=1 pipe=1 vsize=64 threads=1: ops/s=10000 batch_lat_us p50=8 p99=10 max=1629 deliveries/s=10000 deliver_lat_us p50=12 p99=15 max=1648 errors=0
+workers=1 mode=pubsub conns=4 subs=16 pipe=1 vsize=64 threads=1: ops/s=10000 batch_lat_us p50=8 p99=10 max=788 deliveries/s=160000 deliver_lat_us p50=29 p99=47 max=962 errors=0
+workers=1 mode=pubsub conns=4 subs=64 pipe=1 vsize=64 threads=1: ops/s=3125 batch_lat_us p50=9 p99=11 max=358 deliveries/s=200000 deliver_lat_us p50=84 p99=153 max=284 errors=0
+workers=1 mode=pubsub conns=4 subs=256 pipe=1 vsize=64 threads=1: ops/s=781 batch_lat_us p50=13 p99=17 max=705 deliveries/s=199936 deliver_lat_us p50=310 p99=597 max=1308 errors=0
+workers=1 mode=pubsub conns=4 subs=1000 pipe=1 vsize=64 threads=1: ops/s=200 batch_lat_us p50=48 p99=57 max=63 deliveries/s=200000 deliver_lat_us p50=1414 p99=2558 max=2766 errors=0
+workers=4 mode=pubsub conns=4 subs=1 pipe=1 vsize=64 threads=4: ops/s=10000 batch_lat_us p50=8 p99=15 max=2173 deliveries/s=10000 deliver_lat_us p50=17 p99=23 max=2171 errors=0
+workers=4 mode=pubsub conns=4 subs=16 pipe=1 vsize=64 threads=4: ops/s=10000 batch_lat_us p50=12 p99=24 max=4624 deliveries/s=160000 deliver_lat_us p50=34 p99=71 max=4792 errors=0
+workers=4 mode=pubsub conns=4 subs=64 pipe=1 vsize=64 threads=4: ops/s=3125 batch_lat_us p50=28 p99=50 max=320 deliveries/s=200000 deliver_lat_us p50=104 p99=304 max=598 errors=0
+workers=4 mode=pubsub conns=4 subs=256 pipe=1 vsize=64 threads=4: ops/s=781 batch_lat_us p50=81 p99=122 max=598 deliveries/s=199936 deliver_lat_us p50=399 p99=846 max=2547 errors=0
+workers=4 mode=pubsub conns=4 subs=1000 pipe=1 vsize=64 threads=4: ops/s=200 batch_lat_us p50=320 p99=387 max=1076 deliveries/s=200000 deliver_lat_us p50=1410 p99=2596 max=2825 errors=0
+## idle memory, 100000 connections, 4 workers (RSS of the server, KB)
+idle (PING once each, no subscription): base=1956KB with_conns=31028KB per_conn=297 B
+idle subscribers (each subscribed to 1 shared channel, subqueue=1024): base=1964KB with_conns=59972KB per_conn=594 B
+idle subscribers, subqueue=16: base=2072KB with_conns=36664KB per_conn=354 B
+## the lock: 4 workers, 64 connections, 1000 keys. read% = share of GETs; lock_contended = acquisitions that had to park
+./server read%=100 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1297050 errors=0
+    server: live=0 rps=611514 keys=0 topics=0 lock_contended=0 rss=2 MB
+./server read%=90 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=564998 errors=0
+    server: live=0 rps=275029 keys=1000 topics=0 lock_contended=2495838 rss=5 MB
+./server read%=50 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=326466 errors=0
+    server: live=0 rps=151849 keys=1000 topics=0 lock_contended=1473353 rss=5 MB
+./server read%=0 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=304248 errors=0
+    server: live=0 rps=138465 keys=1000 topics=0 lock_contended=1376981 rss=5 MB
+./server_spin100 read%=100 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1297572 errors=0
+    server: live=0 rps=611049 keys=0 topics=0 lock_contended=0 rss=2 MB
+./server_spin100 read%=90 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1276341 errors=0
+    server: live=0 rps=614730 keys=1000 topics=0 lock_contended=47148 rss=5 MB
+./server_spin100 read%=50 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=326050 errors=0
+    server: live=0 rps=154524 keys=1000 topics=0 lock_contended=1467900 rss=5 MB
+./server_spin100 read%=0 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=290394 errors=0
+    server: live=0 rps=125663 keys=1000 topics=0 lock_contended=1306181 rss=5 MB
+./server_spin2000 read%=100 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1290258 errors=0
+    server: live=0 rps=607591 keys=0 topics=0 lock_contended=0 rss=2 MB
+./server_spin2000 read%=90 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1287138 errors=0
+    server: live=0 rps=600693 keys=1000 topics=0 lock_contended=0 rss=5 MB
+./server_spin2000 read%=50 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1267635 errors=0
+    server: live=0 rps=598601 keys=1000 topics=0 lock_contended=0 rss=5 MB
+./server_spin2000 read%=0 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1285779 errors=0
+    server: live=0 rps=604695 keys=1000 topics=0 lock_contended=0 rss=5 MB

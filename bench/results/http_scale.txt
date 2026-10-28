@@ -1,0 +1,50 @@
+### N=10000
+-- strata-c
+N=10000 srcips=1 | server_rss_delta=0 MB (94 B/conn) | client_rss=2 MB | system_delta=-13 MB | kernel_est=-859 B/socket
+conns=10000 ready=10000 active=64 threads=4 | reqs=3758256 rps=1252722 | lat_us p50=42 p90=78 p99=98 p999=117 max=202 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=21 MB
+-- tokio pc lazy
+N=10000 srcips=1 | server_rss_delta=29 MB (3087 B/conn) | client_rss=2 MB | system_delta=104 MB | kernel_est=3816 B/socket
+conns=10000 ready=10000 active=64 threads=4 | reqs=3586438 rps=1195447 | lat_us p50=49 p90=69 p99=84 p999=100 max=260 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=83 MB
+-- tokio pc inline
+N=10000 srcips=1 | server_rss_delta=29 MB (3078 B/conn) | client_rss=2 MB | system_delta=66 MB | kernel_est=1815 B/socket
+conns=10000 ready=10000 active=64 threads=4 | reqs=3658094 rps=1219333 | lat_us p50=50 p90=69 p99=83 p999=96 max=192 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=76 MB
+-- tokio mt inline
+N=10000 srcips=1 | server_rss_delta=29 MB (3075 B/conn) | client_rss=2 MB | system_delta=96 MB | kernel_est=3428 B/socket
+conns=10000 ready=10000 active=64 threads=4 | reqs=2955909 rps=985280 | lat_us p50=63 p90=90 p99=113 p999=133 max=2984 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=82 MB
+### N=100000
+-- strata-c
+N=100000 srcips=9 | server_rss_delta=8 MB (89 B/conn) | client_rss=4 MB | system_delta=565 MB | kernel_est=2898 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3882181 rps=1294027 | lat_us p50=40 p90=74 p99=88 p999=110 max=304 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=553 MB
+-- tokio pc lazy
+N=100000 srcips=9 | server_rss_delta=294 MB (3084 B/conn) | client_rss=4 MB | system_delta=972 MB | kernel_est=3531 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3714863 rps=1238261 | lat_us p50=52 p90=68 p99=77 p999=85 max=184 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=907 MB
+-- tokio pc inline
+N=100000 srcips=9 | server_rss_delta=293 MB (3074 B/conn) | client_rss=4 MB | system_delta=967 MB | kernel_est=3514 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3745437 rps=1248448 | lat_us p50=47 p90=67 p99=77 p999=84 max=2632 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=914 MB
+-- tokio mt inline
+N=100000 srcips=9 | server_rss_delta=293 MB (3073 B/conn) | client_rss=4 MB | system_delta=930 MB | kernel_est=3318 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3031919 rps=1010615 | lat_us p50=62 p90=88 p99=109 p999=125 max=3745 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=884 MB
+### N=200000
+-- strata-c
+N=200000 srcips=17 | server_rss_delta=16 MB (88 B/conn) | client_rss=6 MB | system_delta=1256 MB | kernel_est=3231 B/socket
+conns=200000 ready=200000 active=64 threads=4 | reqs=3890607 rps=1296836 | lat_us p50=39 p90=72 p99=83 p999=91 max=436 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=1236 MB
+-- tokio pc lazy
+N=200000 srcips=17 | server_rss_delta=587 MB (3078 B/conn) | client_rss=6 MB | system_delta=1915 MB | kernel_est=3465 B/socket
+conns=200000 ready=200000 active=64 threads=4 | reqs=3728032 rps=1242648 | lat_us p50=49 p90=64 p99=71 p999=78 max=183 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=1857 MB
+-- tokio pc inline
+N=200000 srcips=17 | server_rss_delta=586 MB (3072 B/conn) | client_rss=6 MB | system_delta=1928 MB | kernel_est=3502 B/socket
+conns=200000 ready=200000 active=64 threads=4 | reqs=3759179 rps=1253030 | lat_us p50=49 p90=67 p99=75 p999=82 max=185 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=1870 MB
+-- tokio mt inline
+N=200000 srcips=17 | server_rss_delta=585 MB (3072 B/conn) | client_rss=6 MB | system_delta=1986 MB | kernel_est=3654 B/socket
+conns=200000 ready=200000 active=64 threads=4 | reqs=3052032 rps=1017320 | lat_us p50=62 p90=87 p99=107 p999=123 max=3949 (>20ms: 0) | err connect=0 io=0 partial=0 | client_mem_delta=2000 MB
+
+### NOTE (added after the run above)
+The "tokio pc lazy" rows above are INVALID as a "lazy buffer" measurement: that handler kept its 2 KB Vec across an await
+(Tokio leaves a socket marked readable after a short read, so readable().await returned at once, the buffer was taken,
+try_read hit WouldBlock and the task parked holding it). Corrected handler (no buffer across an await), same server args:
+-- tokio pc lazy (fixed) N=10000   server_rss_delta=8 MB   (904 B/conn)  rps=1260527 p50=47 p99=72
+-- tokio pc lazy (fixed) N=100000  server_rss_delta=85 MB  (897 B/conn)  rps=1246358 p50=53 p99=78
+-- tokio pc lazy (fixed) N=200000  server_rss_delta=170 MB (896 B/conn)  rps=1252726 p50=49 p99=78
+Server-bound runs (256 active conns, 6 client threads, server CPU-saturated), rps / p50 us:
+workers=1  strata-c 317517/791   tokio pc lazy 296397/849   tokio pc inline 301306/837   tokio mt inline 296934/860
+workers=2  strata-c 639491/405   tokio pc lazy 599561/438   tokio pc inline 600697/420   tokio mt inline 588517/429

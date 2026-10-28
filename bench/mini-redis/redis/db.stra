@@ -1,0 +1,148 @@
+// redis/db.stra - the shared database: key/value entries with optional expiry, and the channel table for pub/sub.
+// Original: db.rs (Arc<Mutex<State>> + a purge task + Notify + broadcast channels).
+// Differences, each deliberate:
+//   * values are shared as Ref<Value> (atomic count): get() copies the Ref out of sync(), so the reply is written AFTER the lock is released;
+//     a parking send never happens inside sync/mutate (that is a compile error).
+//   * entering sync/mutate PARKS the vthread while another worker holds the lock (design doc 7.1); the critical sections themselves never park
+//     and are bounded (purgeExpired removes at most PURGE_BATCH keys per hold). So every Db method that locks may park, and none can be called
+//     from cleanup(): a connection that ends hands its (channel, mailbox) pairs to release(), a non-parking push on the reaper queue, and the
+//     purge vthread, which may park, does the unsubscribing.
+const PURGE_BATCH: usize = 1000                          // keys removed per lock hold: the stated bound on how long purgeExpired keeps the lock
+//   * maxKeys / maxValue / maxTopics are enforced; the original has no limit.
+//   * a topic with no subscribers is removed; the original keeps it forever.
+//   * a full subscriber queue refuses the message and counts it (runtime/sync.stra Mailbox); the original silently drops the oldest.
+import runtime.leaves
+import runtime.sync
+import redis.types
+import redis.limits
+
+struct Value { bytes: u8[] }                             // immutable once built
+struct Message { channel: Ref<Value>, data: Ref<Value> }
+struct Entry { value: Ref<Value>, expiresAt: Instant? }
+struct Topic { name: Ref<Value>, subs: Ref<Mailbox<Message>>[] }
+
+// Everything one lock protects.
+struct Store {
+    entries: Map<Bytes, Entry>
+    expirations: OrderedSet<Expiry>                      // (when, key), earliest first
+    topics: Map<Bytes, Topic>
+}
+struct Expiry { when: Instant, key: Bytes }
+struct Reap { channel: Bytes, mailbox: Ref<Mailbox<Message>> }   // a subscription whose connection has ended
+
+struct Db {
+    store: Ref<Store>
+    purgeWake: Signal                                    // set() tells the purge vthread that the earliest expiry may have moved
+    closed: Flag                                         // the purge vthread ends when it is set
+    reaper: Ref<Mailbox<Reap>>                           // sized maxConns * maxSubs, the most subscriptions that can exist, so a push cannot fail
+    lim: Limits
+
+    static fn make(lim: Limits): Ref<Db> {
+        return new Db { store: new Store {}, purgeWake: Signal.make(), closed: Flag.make(),
+                        reaper: Mailbox<Reap>.make(lim.maxConns * lim.maxSubs), lim: lim }
+    }
+
+    // For cleanup(): never parks, never locks. The purge vthread unsubscribes it shortly after.
+    fn release(channel: u8[]&, mb: Ref<Mailbox<Message>>) { reaper.tryPush(Reap { channel: Bytes.copyOf(channel), mailbox: mb }) }
+
+    fn get(key: u8[]&): Ref<Value>? {
+        sync(store) {
+            let e = store.entries.get(key)
+            return e == null ? null : e.value            // copying a Ref is an atomic increment; it outlives the lock
+        }
+    }
+
+    fn set(key: u8[]&, value: u8[]&, expire: Duration?) throws StoreFull {
+        if (value.length > lim.maxBulk) throw StoreFull("ERR value too large")
+        let data = new Value { bytes: value.copy() }     // allocated and copied BEFORE the lock
+        let name = Bytes.copyOf(key)
+        let when: Instant? = expire == null ? null : Instant.now() + expire
+        var wake = false
+        mutate(store) {
+            let prev = store.entries.get(key)
+            if (prev == null && store.entries.count >= lim.maxKeys) throw StoreFull("ERR max keys")
+            if (when != null) {
+                let first = store.expirations.first()
+                wake = first == null || first.when > when
+            }
+            if (prev != null && prev.expiresAt != null) store.expirations.remove(Expiry { when: prev.expiresAt, key: name })
+            store.entries.insert(name, Entry { value: data, expiresAt: when })
+            if (when != null) store.expirations.insert(Expiry { when: when, key: name })
+        }
+        if (wake) purgeWake.notify()                     // after the lock is released
+    }
+
+    // Number of subscribers the message was offered to (the original returns the receiver count too, lagged or not).
+    fn publish(channel: u8[]&, message: u8[]&): usize {
+        let data = new Value { bytes: message.copy() }
+        sync(store) {
+            let t = store.topics.get(channel)
+            if (t == null) return 0
+            for (mb in t.subs) mb.tryPush(Message { channel: t.name, data: data })   // never parks; false = full, counted by the mailbox
+            return t.subs.count
+        }
+    }
+
+    fn subscribe(channel: u8[]&, mb: Ref<Mailbox<Message>>) throws StoreFull {
+        mutate(store) {
+            var t = store.topics.get(channel)
+            if (t == null) {
+                if (store.topics.count >= lim.maxTopics) throw StoreFull("ERR max channels")
+                store.topics.insert(Bytes.copyOf(channel), Topic { name: new Value { bytes: channel.copy() }, subs: [] })
+                t = store.topics.get(channel)
+            }
+            if (!t.subs.contains(mb)) t.subs.push(mb)
+        }
+    }
+
+    fn unsubscribe(channel: u8[]&, mb: Ref<Mailbox<Message>>) {
+        mutate(store) {
+            let t = store.topics.get(channel)
+            if (t == null) return
+            t.subs.remove(mb)
+            if (t.subs.count == 0) store.topics.remove(channel)
+        }
+    }
+
+    // Removes every entry whose time has come. Returns the next expiry, or null if there is none.
+    // At most PURGE_BATCH keys per lock hold; between holds the vthread yields so other vthreads, and waiters for the lock, run.
+    fn purgeExpired(): Instant? {
+        while (true) {
+            var next: Instant? = null
+            var full = false
+            mutate(store) {
+                let now = Instant.now()
+                var n = 0
+                while (n < PURGE_BATCH) {
+                    let first = store.expirations.first()
+                    if (first == null) break
+                    if (first.when > now) { next = first.when; break }
+                    store.entries.remove(first.key)
+                    store.expirations.remove(first)
+                    n += 1
+                }
+                full = n == PURGE_BATCH
+            }
+            if (!full) return next
+            yield()
+        }
+    }
+
+    fn drainReaper() {
+        while (true) {
+            let r = reaper.tryPop()
+            if (r == null) return
+            unsubscribe(r.channel, r.mailbox)            // parks if the lock is busy: fine, this is an ordinary vthread
+        }
+    }
+
+    // The background vthread (original: purge_expired_tasks). Spawned once, ends when `closed` is set. Throws nothing.
+    fn purgeLoop() {
+        while (!closed.isSet()) {
+            drainReaper()
+            let next = purgeExpired()
+            if (next != null) waitAny(Wakeup.at(next), purgeWake.wakeup(), reaper.wakeup(), closed.wakeup())
+            else waitAny(purgeWake.wakeup(), reaper.wakeup(), closed.wakeup())
+        }
+    }
+}

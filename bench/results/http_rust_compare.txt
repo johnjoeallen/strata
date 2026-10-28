@@ -1,0 +1,63 @@
+## RUST vs C, same loadgen, 1 worker. Instant handlers, 16 conns, K=16 pipelined
+C    sequential (flush each)       conns=16 K=16 | rps=452400 | first_resp_us mean=535 max=4833 | batch_done p50=549 | err connect=0 io=0 partial=0
+Rust sequential (flush each)       conns=16 K=16 | rps=444748 | first_resp_us mean=545 max=945 | batch_done p50=559 | err connect=0 io=0 partial=0
+C    concurrent, inline fast path  conns=16 K=16 | rps=4070934 | first_resp_us mean=62 max=2859 | batch_done p50=62 | err connect=0 io=0 partial=0
+Rust concurrent, inline fast path  conns=16 K=16 | rps=2108637 | first_resp_us mean=121 max=4089 | batch_done p50=120 | err connect=0 io=0 partial=0
+C    concurrent, always spawn      conns=16 K=16 | rps=4092329 | first_resp_us mean=62 max=2290 | batch_done p50=61 | err connect=0 io=0 partial=0
+Rust concurrent, always spawn      conns=16 K=16 | rps=2101027 | first_resp_us mean=121 max=6743 | batch_done p50=121 | err connect=0 io=0 partial=0
+C    sequential (flush each)       conns=16 K=16 | rps=454212 | first_resp_us mean=533 max=5307 | batch_done p50=546 | err connect=0 io=0 partial=0
+Rust sequential (flush each)       conns=16 K=16 | rps=445929 | first_resp_us mean=543 max=2614 | batch_done p50=557 | err connect=0 io=0 partial=0
+C    concurrent, inline fast path  conns=16 K=16 | rps=4043500 | first_resp_us mean=63 max=3794 | batch_done p50=62 | err connect=0 io=0 partial=0
+Rust concurrent, inline fast path  conns=16 K=16 | rps=2111848 | first_resp_us mean=121 max=1151 | batch_done p50=120 | err connect=0 io=0 partial=0
+C    concurrent, always spawn      conns=16 K=16 | rps=4067510 | first_resp_us mean=62 max=3330 | batch_done p50=61 | err connect=0 io=0 partial=0
+Rust concurrent, always spawn      conns=16 K=16 | rps=2111856 | first_resp_us mean=121 max=2006 | batch_done p50=120 | err connect=0 io=0 partial=0
+C    sequential (flush each)       conns=16 K=16 | rps=449930 | first_resp_us mean=538 max=2879 | batch_done p50=552 | err connect=0 io=0 partial=0
+Rust sequential (flush each)       conns=16 K=16 | rps=446245 | first_resp_us mean=543 max=2796 | batch_done p50=557 | err connect=0 io=0 partial=0
+C    concurrent, inline fast path  conns=16 K=16 | rps=4049585 | first_resp_us mean=63 max=897 | batch_done p50=62 | err connect=0 io=0 partial=0
+Rust concurrent, inline fast path  conns=16 K=16 | rps=2109501 | first_resp_us mean=121 max=4061 | batch_done p50=120 | err connect=0 io=0 partial=0
+C    concurrent, always spawn      conns=16 K=16 | rps=4096624 | first_resp_us mean=62 max=4694 | batch_done p50=61 | err connect=0 io=0 partial=0
+Rust concurrent, always spawn      conns=16 K=16 | rps=2105710 | first_resp_us mean=121 max=2671 | batch_done p50=120 | err connect=0 io=0 partial=0
+## no pipelining (K=1)
+C    sequential                    conns=16 K=1 | rps=304215 | first_resp_us mean=0 max=0 | batch_done p50=51 | err connect=0 io=0 partial=0
+Rust sequential                    conns=16 K=1 | rps=284608 | first_resp_us mean=0 max=0 | batch_done p50=54 | err connect=0 io=0 partial=0
+C    concurrent, inline            conns=16 K=1 | rps=296994 | first_resp_us mean=0 max=0 | batch_done p50=52 | err connect=0 io=0 partial=0
+Rust concurrent, inline            conns=16 K=1 | rps=283683 | first_resp_us mean=0 max=0 | batch_done p50=54 | err connect=0 io=0 partial=0
+C    sequential                    conns=16 K=1 | rps=304067 | first_resp_us mean=0 max=0 | batch_done p50=51 | err connect=0 io=0 partial=0
+Rust sequential                    conns=16 K=1 | rps=286704 | first_resp_us mean=0 max=0 | batch_done p50=54 | err connect=0 io=0 partial=0
+C    concurrent, inline            conns=16 K=1 | rps=298431 | first_resp_us mean=0 max=0 | batch_done p50=52 | err connect=0 io=0 partial=0
+Rust concurrent, inline            conns=16 K=1 | rps=287138 | first_resp_us mean=0 max=0 | batch_done p50=54 | err connect=0 io=0 partial=0
+## diagnostic: where does the Rust pipelined time go? (instant handlers, 16 conns, K=16, 1 worker)
+Rust spawn per request (default)           conns=16 K=16 | rps=2121106 | first_resp_us mean=120 max=313
+Rust NO spawn (all inline, still batched)  conns=16 K=16 | rps=3821926 | first_resp_us mean=66 max=2823
+Rust spawn per request (default)           conns=16 K=16 | rps=2109240 | first_resp_us mean=121 max=6270
+Rust NO spawn (all inline, still batched)  conns=16 K=16 | rps=3810185 | first_resp_us mean=67 max=431
+## parking handlers, 1 ms each (Tokio's timer resolution is 1 ms), K=16, 1 worker
+C    sequential                    conns=1 K=16 | rps=949 | first_resp_us mean=1068 max=1090 | batch_done p50=16895
+C    concurrent depth=16           conns=1 K=16 | rps=14784 | first_resp_us mean=1082 max=5483 | batch_done p50=1066
+Rust sequential                    conns=1 K=16 | rps=480 | first_resp_us mean=2089 max=2147 | batch_done p50=33463
+Rust concurrent depth=16           conns=1 K=16 | rps=7626 | first_resp_us mean=2095 max=7438 | batch_done p50=2086
+C    sequential                    conns=16 K=16 | rps=15146 | first_resp_us mean=1071 max=1308 | batch_done p50=16916
+C    concurrent depth=16           conns=16 K=16 | rps=228672 | first_resp_us mean=1119 max=5075 | batch_done p50=1121
+Rust sequential                    conns=16 K=16 | rps=7626 | first_resp_us mean=2155 max=7112 | batch_done p50=38468
+Rust concurrent depth=16           conns=16 K=16 | rps=113741 | first_resp_us mean=2248 max=7754 | batch_done p50=2257
+## the timer floor: 200 us sleeps (C honours them, Tokio rounds up to ~1 ms), 1 connection, K=16
+C    concurrent sleep_us=200       conns=1 K=16 | rps=59433 | first_resp_us mean=269 max=3258 | batch_done p50=265
+Rust concurrent sleep_us=200       conns=1 K=16 | rps=12480 | first_resp_us mean=1278 max=4151 | batch_done p50=1075
+## one slow CPU request (~1 ms) at position 9 of 16, instant handlers, one unloaded connection
+C    sequential                    conns=1 K=16 | rps=16213 | first_resp_us mean=12 max=39 | batch_done p50=945
+Rust sequential                    conns=1 K=16 | rps=280111 | first_resp_us mean=11 max=1703 | batch_done p50=55
+C    concurrent (/slow unbounded)   conns=1 K=16 | rps=16661 | first_resp_us mean=11 max=104 | batch_done p50=918
+Rust concurrent (/slow unbounded)   conns=1 K=16 | rps=534663 | first_resp_us mean=10 max=2963 | batch_done p50=28
+## (corrected) one slow CPU request at position 9 of 16, instant handlers, one unloaded connection
+C    sequential                        | first_resp_us mean=12 max=66 | batch_done p50=944
+Rust sequential                        | first_resp_us mean=13 max=30 | batch_done p50=947
+C    concurrent, /slow unbounded       | first_resp_us mean=10 max=47 | batch_done p50=920
+Rust concurrent, /slow unbounded       | first_resp_us mean=13 max=762 | batch_done p50=923
+C    concurrent, /slow NOT a barrier   | first_resp_us mean=946 max=4985 | batch_done p50=916
+## idle memory per connection, 100k connections, 4 workers (server RSS delta)
+-- ../../rust/target/release/http_pipe conc=0
+N=100000 srcips=9 | server_rss_delta=134 MB (1413 B/conn) | client_rss=4 MB | system_delta=837 MB | kernel_est=3661 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3630117 rps=1210010 | lat_us p50=50 p90=66 p99=78 p999=94 max=190 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=7
+-- ../../rust/target/release/http_pipe conc=1
+N=100000 srcips=9 | server_rss_delta=146 MB (1539 B/conn) | client_rss=4 MB | system_delta=838 MB | kernel_est=3603 B/socket
+conns=100000 ready=100000 active=64 threads=4 | reqs=3650244 rps=1216719 | lat_us p50=52 p90=66 p99=80 p999=103 max=316 (>20ms: 0) | err connect=0 io=0 partial=0 | first_resp_us mean=0 max=0 | client_mem_delta=

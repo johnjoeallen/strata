@@ -1,0 +1,36 @@
+// redis/types.stra - the vocabulary of the library: argument views, scan results, exceptions.
+// The original's Frame enum (Simple, Error, Integer, Bulk, Null, Array) is split by direction: requests are scanned into offsets (Arg, below),
+// replies are written straight to the socket (Writer, redis/reply.stra). Neither builds a tree of heap-allocated frames.
+import runtime.leaves
+import redis.limits
+
+exception ProtocolError { message: string }              // malformed input. The server answers "-ERR <message>" and closes (the original closes silently)
+exception FrameTooLarge                                  // a declared length or the frame as a whole is over its limit; "-ERR frame too large", then close
+exception StoreFull { message: string }                  // maxKeys, maxTopics or maxSubs reached; the command is refused, the connection stays
+
+enum ArgKind { Simple, Bulk, Integer, Null }             // the element kinds the original accepts inside a command array
+
+// One argument of a command: where it is in the reader's buffer. The buffer may move while a frame is still arriving, never after it is complete.
+struct Arg { kind: ArgKind, start: usize, end: usize, number: u64 }
+
+// A command frame's arguments. About 2 KB, so pool-allocated like OutBuf: never a local and never a field a connection keeps while idle.
+// The Reader takes one from the pool when a frame starts to arrive and gives it back in finish().
+struct Args {
+    items: Arg[MAX_ARGS]
+    count: usize = 0
+}
+extern let argsPool: ArgsPool
+extern struct ArgsPool { fn get(): Args }                // a block whose cleanup() returns it to the pool; server.c: args_pool
+
+// Result of scanning the buffered bytes for one frame.
+enum Scan {
+    Done(len: usize)         // a complete frame of `len` bytes starts at the buffer's `start`; Args is filled in
+    More(needed: usize)      // not yet: at least `needed` bytes (counted from `start`) must be buffered before the scan can make progress
+}
+
+// What the non-parking reader found.
+enum Input {
+    Frame                    // a complete frame is ready: its arguments are Reader.frame()
+    Idle                     // nothing to read right now
+    Closed                   // the peer closed at a frame boundary
+}

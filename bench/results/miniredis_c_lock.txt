@@ -1,0 +1,29 @@
+# the lock, 2026-10-28: 4 workers on cores 0-3, 64 connections on 4 loadgen threads (cores 8-11), 1000 keys, 4 s per point
+# server_park = park at once; server_spin100 / server (spin 2000) = spin that many rounds first. lock_contended = acquisitions that had to park (cumulative)
+./server_park read%=100 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1286144 errors=0
+    server: live=0 rps=612540 keys=0 topics=0 lock_contended=0 rss=1 MB
+./server_park read%=90 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=570076 errors=0
+    server: live=0 rps=276217 keys=1000 topics=0 lock_contended=2509614 rss=5 MB
+./server_park read%=50 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=330005 errors=0
+    server: live=0 rps=153656 keys=1000 topics=0 lock_contended=1483524 rss=5 MB
+./server_park read%=0 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=318224 errors=0
+    server: live=0 rps=140053 keys=1000 topics=0 lock_contended=1436771 rss=5 MB
+./server_spin100 read%=100 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1254644 errors=0
+    server: live=0 rps=593397 keys=0 topics=0 lock_contended=0 rss=2 MB
+./server_spin100 read%=90 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1279764 errors=0
+    server: live=0 rps=606721 keys=1000 topics=0 lock_contended=0 rss=5 MB
+./server_spin100 read%=50 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1000522 errors=0
+    server: live=0 rps=176047 keys=1000 topics=0 lock_contended=481321 rss=5 MB
+./server_spin100 read%=0 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1270529 errors=0
+    server: live=0 rps=595583 keys=1000 topics=0 lock_contended=0 rss=5 MB
+./server read%=100 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1289900 errors=0
+    server: live=0 rps=607161 keys=0 topics=0 lock_contended=0 rss=1 MB
+./server read%=90 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1283506 errors=0
+    server: live=0 rps=604916 keys=1000 topics=0 lock_contended=0 rss=5 MB
+./server read%=50 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1273322 errors=0
+    server: live=0 rps=600018 keys=1000 topics=0 lock_contended=0 rss=5 MB
+./server read%=0 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1269717 errors=0
+    server: live=0 rps=596618 keys=1000 topics=0 lock_contended=0 rss=5 MB
+workers=4 mode=getset conns=16 subs=0 pipe=1 vsize=16 threads=4: ops/s=1095876 batch_lat_us p50=13 p99=23 max=3341 errors=0
+workers=4 mode=getset conns=16 subs=0 pipe=16 vsize=16 threads=4: ops/s=1935132 batch_lat_us p50=116 p99=267 max=5095 errors=0
+workers=4 mode=getset conns=64 subs=0 pipe=1 vsize=16 threads=4: ops/s=1290533 batch_lat_us p50=46 p99=69 max=222 errors=0

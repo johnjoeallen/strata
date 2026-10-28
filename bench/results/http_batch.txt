@@ -1,0 +1,47 @@
+## opt-in response batching, K=16 pipelined, 1 worker, 16 conns (work = handler spin iterations, ~0.8 ns each)
+server work=0 K=16 | rps=461910 | first_resp_us mean=524 max=4325 | err connect=0 io=0 partial=0
+server_b16 work=0 K=16 | rps=4113516 | first_resp_us mean=62 max=515 | err connect=0 io=0 partial=0
+server work=0 K=16 | rps=457991 | first_resp_us mean=529 max=4298 | err connect=0 io=0 partial=0
+server_b16 work=0 K=16 | rps=4083655 | first_resp_us mean=62 max=4035 | err connect=0 io=0 partial=0
+server work=500 K=16 | rps=368039 | first_resp_us mean=656 max=4589 | err connect=0 io=0 partial=0
+server_b16 work=500 K=16 | rps=1624891 | first_resp_us mean=157 max=5769 | err connect=0 io=0 partial=0
+server work=500 K=16 | rps=365651 | first_resp_us mean=661 max=4628 | err connect=0 io=0 partial=0
+server_b16 work=500 K=16 | rps=1624818 | first_resp_us mean=157 max=4055 | err connect=0 io=0 partial=0
+server work=2000 K=16 | rps=250715 | first_resp_us mean=960 max=2786 | err connect=0 io=0 partial=0
+server_b16 work=2000 K=16 | rps=573942 | first_resp_us mean=445 max=4225 | err connect=0 io=0 partial=0
+server work=2000 K=16 | rps=252980 | first_resp_us mean=951 max=3965 | err connect=0 io=0 partial=0
+server_b16 work=2000 K=16 | rps=574360 | first_resp_us mean=445 max=1075 | err connect=0 io=0 partial=0
+server work=8000 K=16 | rps=120274 | first_resp_us mean=2003 max=8331 | err connect=0 io=0 partial=0
+server_b16 work=8000 K=16 | rps=160220 | first_resp_us mean=1597 max=4153 | err connect=0 io=0 partial=0
+server work=8000 K=16 | rps=118798 | first_resp_us mean=2028 max=4479 | err connect=0 io=0 partial=0
+server_b16 work=8000 K=16 | rps=160444 | first_resp_us mean=1595 max=4513 | err connect=0 io=0 partial=0
+## K=1 reference (no pipelining) to size the handler work
+server work=0 K=1 | rps=305875 | first_resp_us mean=0 max=0 | err connect=0 io=0 partial=0
+server work=2000 K=1 | rps=206224 | first_resp_us mean=0 max=0 | err connect=0 io=0 partial=0
+server work=8000 K=1 | rps=104909 | first_resp_us mean=0 max=0 | err connect=0 io=0 partial=0
+## unloaded: ONE connection, K=16 pipelined per write, 1 worker (first_resp = time until the first response byte arrives)
+server work=0 K=16 | first_resp_us mean=10 max=87 | batch_done_us p50=38 | rps=405494
+server_b16 work=0 K=16 | first_resp_us mean=10 max=379 | batch_done_us p50=10 | rps=1514834
+server work=500 K=16 | first_resp_us mean=9 max=53 | batch_done_us p50=47 | rps=327407
+server_b16 work=500 K=16 | first_resp_us mean=16 max=1469 | batch_done_us p50=15 | rps=977172
+server work=2000 K=16 | first_resp_us mean=9 max=134 | batch_done_us p50=68 | rps=226458
+server_b16 work=2000 K=16 | first_resp_us mean=34 max=4280 | batch_done_us p50=32 | rps=463770
+server work=8000 K=16 | first_resp_us mean=14 max=61 | batch_done_us p50=137 | rps=111875
+server_b16 work=8000 K=16 | first_resp_us mean=107 max=4077 | batch_done_us p50=103 | rps=148503
+## one slow request (GET /slow, ~1 ms handler) at position 9 of 16 pipelined; one unloaded connection; times in us
+no batching                                | first_resp_us mean=13 max=2089 | batch_done p50=944 | rps=16245 | err connect=0 io=0 partial=0
+batching, no hold limit, slow undeclared   | first_resp_us mean=955 max=4371 | batch_done p50=917 | rps=16741 | err connect=0 io=0 partial=0
+batching, hold_us=50, slow undeclared      | first_resp_us mean=921 max=4581 | batch_done p50=916 | rps=17354 | err connect=0 io=0 partial=0
+batching, no hold limit, slow DECLARED     | first_resp_us mean=10 max=177 | batch_done p50=919 | rps=16624 | err connect=0 io=0 partial=0
+batching, hold_us=50, slow DECLARED        | first_resp_us mean=10 max=103 | batch_done p50=919 | rps=16666 | err connect=0 io=0 partial=0
+## control: no slow request (slowpos=0), batching
+batching, hold_us=50, no slow request      | first_resp_us mean=10 max=2072 | batch_done p50=9 | rps=1541825 | err connect=0 io=0 partial=0
+## every handler ~6.3 us (work=8000), K=16 pipelined. unloaded (1 conn) shows the delay; loaded (16 conns) shows throughput
+batching hold_us=0  conns=1 | first_resp_us mean=108 max=4086 | rps=147607
+batching hold_us=0  conns=16 | first_resp_us mean=1603 max=5446 | rps=159661
+batching hold_us=30  conns=1 | first_resp_us mean=49 max=349 | rps=142967
+batching hold_us=30  conns=16 | first_resp_us mean=1618 max=6069 | rps=152492
+batching hold_us=100  conns=1 | first_resp_us mean=106 max=4102 | rps=148263
+batching hold_us=100  conns=16 | first_resp_us mean=1606 max=5466 | rps=159217
+no batching          conns=1 | first_resp_us mean=14 max=92 | rps=112206
+no batching          conns=16 | first_resp_us mean=1965 max=7460 | rps=122562

@@ -1,0 +1,545 @@
+## layout=reserve first=8 cap=8 policy=lowest contract=madvise n=2000000 work=fill
+config: layout=reserve first=8 cap=8 (chunk 16..16 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=fill
+fill: alloc+touch 13.3 ns/op, free (random order) 32.7 ns/op, corrupt=0
+  full           rss=   122.4 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=7813 decommits=7812 commits=0
+## layout=reserve first=8 cap=8 policy=lowest contract=madvise n=2000000 work=churn
+config: layout=reserve first=8 cap=8 (chunk 16..16 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=churn
+churn: 81.1 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.4 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=7813 decommits=7812 commits=0
+## layout=reserve first=8 cap=8 policy=lowest contract=madvise n=2000000 work=mixed
+config: layout=reserve first=8 cap=8 (chunk 16..16 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 8.8 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.7 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.7 MB  live=    12.2 MB  ratio=11.01 (immortals only live)
+  chunks=8596 decommits=8595 commits=0
+## layout=reserve first=8 cap=8 policy=lowest contract=madvise n=2000000 work=ramp pattern=group
+config: layout=reserve first=8 cap=8 (chunk 16..16 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.3 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=    43.3 MB  live=    12.2 MB  ratio= 3.54 
+  after refill   rss=    87.2 MB  live=    73.2 MB  ratio= 1.19 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=7813 decommits=10622 commits=0
+## layout=reserve first=8 cap=8 policy=lowest contract=madvise n=2000000 work=ramp pattern=random
+config: layout=reserve first=8 cap=8 (chunk 16..16 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.3 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.3 MB  live=    12.2 MB  ratio=10.02 
+  after refill   rss=   122.3 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=7813 decommits=7812 commits=0
+## layout=reserve first=10 cap=10 policy=lowest contract=madvise n=2000000 work=fill
+config: layout=reserve first=10 cap=10 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=fill
+fill: alloc+touch 10.9 ns/op, free (random order) 28.0 ns/op, corrupt=0
+  full           rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.2 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=1954 decommits=1953 commits=0
+## layout=reserve first=10 cap=10 policy=lowest contract=madvise n=2000000 work=churn
+config: layout=reserve first=10 cap=10 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=churn
+churn: 65.2 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=1954 decommits=1953 commits=0
+## layout=reserve first=10 cap=10 policy=lowest contract=madvise n=2000000 work=mixed
+config: layout=reserve first=10 cap=10 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 8.2 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=2149 decommits=2148 commits=0
+## layout=reserve first=10 cap=10 policy=lowest contract=madvise n=2000000 work=ramp pattern=group
+config: layout=reserve first=10 cap=10 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=1954 decommits=1953 commits=0
+## layout=reserve first=10 cap=10 policy=lowest contract=madvise n=2000000 work=ramp pattern=random
+config: layout=reserve first=10 cap=10 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=1954 decommits=1953 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise n=2000000 work=fill
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=fill
+fill: alloc+touch 10.8 ns/op, free (random order) 27.8 ns/op, corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise n=2000000 work=churn
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=churn
+churn: 58.5 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=489 decommits=488 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise n=2000000 work=mixed
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 8.0 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=538 decommits=537 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise n=2000000 work=ramp pattern=group
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise n=2000000 work=ramp pattern=random
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=0
+## layout=reserve first=14 cap=14 policy=lowest contract=madvise n=2000000 work=fill
+config: layout=reserve first=14 cap=14 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=fill
+fill: alloc+touch 10.8 ns/op, free (random order) 25.3 ns/op, corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     1.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=123 decommits=122 commits=0
+## layout=reserve first=14 cap=14 policy=lowest contract=madvise n=2000000 work=churn
+config: layout=reserve first=14 cap=14 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=churn
+churn: 51.3 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=123 decommits=122 commits=0
+## layout=reserve first=14 cap=14 policy=lowest contract=madvise n=2000000 work=mixed
+config: layout=reserve first=14 cap=14 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 8.0 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=135 decommits=134 commits=0
+## layout=reserve first=14 cap=14 policy=lowest contract=madvise n=2000000 work=ramp pattern=group
+config: layout=reserve first=14 cap=14 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     1.0 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=123 decommits=122 commits=0
+## layout=reserve first=14 cap=14 policy=lowest contract=madvise n=2000000 work=ramp pattern=random
+config: layout=reserve first=14 cap=14 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     1.0 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=123 decommits=122 commits=0
+## layout=reserve first=15 cap=15 policy=lowest contract=madvise n=2000000 work=fill
+config: layout=reserve first=15 cap=15 (chunk 2048..2048 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=fill
+fill: alloc+touch 11.2 ns/op, free (random order) 28.7 ns/op, corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=62 decommits=61 commits=0
+## layout=reserve first=15 cap=15 policy=lowest contract=madvise n=2000000 work=churn
+config: layout=reserve first=15 cap=15 (chunk 2048..2048 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=churn
+churn: 52.9 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=62 decommits=61 commits=0
+## layout=reserve first=15 cap=15 policy=lowest contract=madvise n=2000000 work=mixed
+config: layout=reserve first=15 cap=15 (chunk 2048..2048 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 7.9 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=68 decommits=67 commits=0
+## layout=reserve first=15 cap=15 policy=lowest contract=madvise n=2000000 work=ramp pattern=group
+config: layout=reserve first=15 cap=15 (chunk 2048..2048 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     2.0 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=62 decommits=61 commits=0
+## layout=reserve first=15 cap=15 policy=lowest contract=madvise n=2000000 work=ramp pattern=random
+config: layout=reserve first=15 cap=15 (chunk 2048..2048 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     2.0 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=62 decommits=61 commits=0
+## layout=reserve first=6 cap=12 policy=lowest contract=madvise n=2000000 work=fill
+config: layout=reserve first=6 cap=12 (chunk 4..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=fill
+fill: alloc+touch 10.8 ns/op, free (random order) 27.7 ns/op, corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=494 decommits=493 commits=0
+## layout=reserve first=6 cap=12 policy=lowest contract=madvise n=2000000 work=churn
+config: layout=reserve first=6 cap=12 (chunk 4..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=churn
+churn: 56.7 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=494 decommits=493 commits=0
+## layout=reserve first=6 cap=12 policy=lowest contract=madvise n=2000000 work=mixed
+config: layout=reserve first=6 cap=12 (chunk 4..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 8.0 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=543 decommits=542 commits=0
+## layout=reserve first=6 cap=12 policy=lowest contract=madvise n=2000000 work=ramp pattern=group
+config: layout=reserve first=6 cap=12 (chunk 4..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.0 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=494 decommits=494 commits=0
+## layout=reserve first=6 cap=12 policy=lowest contract=madvise n=2000000 work=ramp pattern=random
+config: layout=reserve first=6 cap=12 (chunk 4..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=494 decommits=493 commits=0
+## layout=reserve first=6 cap=14 policy=lowest contract=madvise n=2000000 work=fill
+config: layout=reserve first=6 cap=14 (chunk 4..1024 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=fill
+fill: alloc+touch 10.8 ns/op, free (random order) 26.6 ns/op, corrupt=0
+  full           rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=130 decommits=129 commits=0
+## layout=reserve first=6 cap=14 policy=lowest contract=madvise n=2000000 work=churn
+config: layout=reserve first=6 cap=14 (chunk 4..1024 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=churn
+churn: 52.6 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=130 decommits=129 commits=0
+## layout=reserve first=6 cap=14 policy=lowest contract=madvise n=2000000 work=mixed
+config: layout=reserve first=6 cap=14 (chunk 4..1024 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 7.8 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=142 decommits=141 commits=0
+## layout=reserve first=6 cap=14 policy=lowest contract=madvise n=2000000 work=ramp pattern=group
+config: layout=reserve first=6 cap=14 (chunk 4..1024 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.0 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.0 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=130 decommits=130 commits=0
+## layout=reserve first=6 cap=14 policy=lowest contract=madvise n=2000000 work=ramp pattern=random
+config: layout=reserve first=6 cap=14 (chunk 4..1024 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     1.0 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=130 decommits=129 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=none n=2000000 work=ramp pattern=random
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=none spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=   122.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=0 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=none n=2000000 work=ramp pattern=fifo
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=none spare=1 slot=64 n=2000000 work=ramp
+ramp(fifo): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=   122.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=0 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=none n=2000000 work=ramp pattern=group
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=none spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=   122.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=0 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=none n=2000000 work=mixed
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=none spare=1 slot=64 n=2000000 work=mixed
+mixed: 7.2 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=538 decommits=0 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise n=2000000 work=ramp pattern=random
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise n=2000000 work=ramp pattern=fifo
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(fifo): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=    12.6 MB  live=    12.2 MB  ratio= 1.03 
+  after refill   rss=    73.5 MB  live=    73.2 MB  ratio= 1.00 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=732 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise n=2000000 work=ramp pattern=group
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.01 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise n=2000000 work=mixed
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 7.4 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=538 decommits=537 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=none n=2000000 work=ramp pattern=random
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=none spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=   122.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=0 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=none n=2000000 work=ramp pattern=fifo
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=none spare=1 slot=64 n=2000000 work=ramp
+ramp(fifo): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.01 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=   122.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=0 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=none n=2000000 work=ramp pattern=group
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=none spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=   122.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=0 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=none n=2000000 work=mixed
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=none spare=1 slot=64 n=2000000 work=mixed
+mixed: 8.1 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=538 decommits=0 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise n=2000000 work=ramp pattern=random
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.01 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise n=2000000 work=ramp pattern=fifo
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(fifo): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=    12.6 MB  live=    12.2 MB  ratio= 1.03 
+  after refill   rss=    73.4 MB  live=    73.2 MB  ratio= 1.00 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=732 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise n=2000000 work=ramp pattern=group
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise n=2000000 work=mixed
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 8.2 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=538 decommits=537 commits=0
+## layout=chunked first=12 cap=12 policy=lowest contract=madvise n=2000000 work=fill
+config: layout=chunked first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=fill
+fill: alloc+touch 12.0 ns/op, free (random order) 24.7 ns/op, corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=489
+## layout=chunked first=12 cap=12 policy=lowest contract=madvise n=2000000 work=churn
+config: layout=chunked first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=churn
+churn: 61.4 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=489 decommits=488 commits=489
+## layout=chunked first=12 cap=12 policy=lowest contract=madvise n=2000000 work=mixed
+config: layout=chunked first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 8.7 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=538 decommits=537 commits=538
+## layout=chunked first=12 cap=12 policy=lowest contract=madvise n=2000000 work=ramp pattern=group
+config: layout=chunked first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=489
+## layout=chunked first=12 cap=12 policy=lowest contract=munmap n=2000000 work=fill
+config: layout=chunked first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=munmap spare=1 slot=64 n=2000000 work=fill
+fill: alloc+touch 11.6 ns/op, free (random order) 29.3 ns/op, corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=489
+## layout=chunked first=12 cap=12 policy=lowest contract=munmap n=2000000 work=churn
+config: layout=chunked first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=munmap spare=1 slot=64 n=2000000 work=churn
+churn: 61.1 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=489 decommits=488 commits=489
+## layout=chunked first=12 cap=12 policy=lowest contract=munmap n=2000000 work=mixed
+config: layout=chunked first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=munmap spare=1 slot=64 n=2000000 work=mixed
+mixed: 8.8 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=10.99 (immortals only live)
+  chunks=538 decommits=537 commits=538
+## layout=chunked first=12 cap=12 policy=lowest contract=munmap n=2000000 work=ramp pattern=group
+config: layout=chunked first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=munmap spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free 90% rss=   122.1 MB  live=    12.2 MB  ratio=10.00 
+  after refill   rss=   122.1 MB  live=    73.2 MB  ratio= 1.67 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=489
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise slot=16 n=8000000 work=fill
+config: layout=reserve first=12 cap=12 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=16 n=8000000 work=fill
+fill: alloc+touch 4.7 ns/op, free (random order) 40.6 ns/op, corrupt=0
+  full           rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.2 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=1954 decommits=1953 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise slot=16 n=8000000 work=churn
+config: layout=reserve first=12 cap=12 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=16 n=8000000 work=churn
+churn: 97.0 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=1954 decommits=1953 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise slot=16 n=8000000 work=mixed
+config: layout=reserve first=12 cap=12 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=16 n=8000000 work=mixed
+mixed: 6.3 ns/step, short live=8000000, immortal=800128
+  steady state   rss=   134.4 MB  live=   134.3 MB  ratio= 1.00 
+  after burst    rss=   134.4 MB  live=    12.2 MB  ratio=11.01 (immortals only live)
+  chunks=2149 decommits=2148 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise slot=256 n=500000 work=fill
+config: layout=reserve first=12 cap=12 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=256 n=500000 work=fill
+fill: alloc+touch 37.7 ns/op, free (random order) 27.6 ns/op, corrupt=0
+  full           rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.2 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=123 decommits=122 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise slot=256 n=500000 work=churn
+config: layout=reserve first=12 cap=12 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=256 n=500000 work=churn
+churn: 47.2 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=123 decommits=122 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise slot=256 n=500000 work=mixed
+config: layout=reserve first=12 cap=12 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=256 n=500000 work=mixed
+mixed: 18.0 ns/step, short live=500000, immortal=49741
+  steady state   rss=   134.3 MB  live=   134.2 MB  ratio= 1.00 
+  after burst    rss=   134.3 MB  live=    12.1 MB  ratio=11.06 (immortals only live)
+  chunks=135 decommits=134 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise slot=1024 n=125000 work=fill
+config: layout=reserve first=12 cap=12 (chunk 4096..4096 KB) policy=lowest contract=madvise spare=1 slot=1024 n=125000 work=fill
+fill: alloc+touch 135.8 ns/op, free (random order) 48.6 ns/op, corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     4.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=31 decommits=30 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise slot=1024 n=125000 work=churn
+config: layout=reserve first=12 cap=12 (chunk 4096..4096 KB) policy=lowest contract=madvise spare=1 slot=1024 n=125000 work=churn
+churn: 58.4 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=31 decommits=30 commits=0
+## layout=reserve first=12 cap=12 policy=lowest contract=madvise slot=1024 n=125000 work=mixed
+config: layout=reserve first=12 cap=12 (chunk 4096..4096 KB) policy=lowest contract=madvise spare=1 slot=1024 n=125000 work=mixed
+mixed: 61.6 ns/step, short live=125000, immortal=12392
+  steady state   rss=   134.2 MB  live=   134.2 MB  ratio= 1.00 
+  after burst    rss=   134.2 MB  live=    12.1 MB  ratio=11.09 (immortals only live)
+  chunks=34 decommits=33 commits=0
+## layout=malloc slot=16 n=8000000 work=fill
+config: layout=malloc first=12 cap=12 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=16 n=8000000 work=fill
+fill: alloc+touch 10.3 ns/op, free (random order) 63.2 ns/op, corrupt=0
+  full           rss=   244.2 MB  live=   122.1 MB  ratio= 2.00 
+  after free all rss=   244.2 MB  live=     0.0 MB  ratio= 0.00 
+## layout=malloc slot=16 n=8000000 work=churn
+config: layout=malloc first=12 cap=12 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=16 n=8000000 work=churn
+churn: 67.3 ns per free+alloc pair, corrupt=0
+  after churn    rss=   244.3 MB  live=   122.1 MB  ratio= 2.00 
+## layout=malloc slot=16 n=8000000 work=mixed
+config: layout=malloc first=12 cap=12 (chunk 64..64 KB) policy=lowest contract=madvise spare=1 slot=16 n=8000000 work=mixed
+mixed: 6.7 ns/step, short live=8000000, immortal=800128
+  steady state   rss=   268.6 MB  live=   134.3 MB  ratio= 2.00 
+  after burst    rss=   268.6 MB  live=    12.2 MB  ratio=22.00 (immortals only live)
+## layout=malloc slot=64 n=2000000 work=fill
+config: layout=malloc first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=fill
+fill: alloc+touch 16.2 ns/op, free (random order) 49.3 ns/op, corrupt=0
+  full           rss=   152.7 MB  live=   122.1 MB  ratio= 1.25 
+  after free all rss=   152.7 MB  live=     0.0 MB  ratio= 0.00 
+## layout=malloc slot=64 n=2000000 work=churn
+config: layout=malloc first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=churn
+churn: 76.5 ns per free+alloc pair, corrupt=0
+  after churn    rss=   152.7 MB  live=   122.1 MB  ratio= 1.25 
+## layout=malloc slot=64 n=2000000 work=mixed
+config: layout=malloc first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=mixed
+mixed: 8.6 ns/step, short live=2000000, immortal=200403
+  steady state   rss=   167.9 MB  live=   134.3 MB  ratio= 1.25 
+  after burst    rss=   167.9 MB  live=    12.2 MB  ratio=13.73 (immortals only live)
+## layout=malloc slot=256 n=500000 work=fill
+config: layout=malloc first=12 cap=12 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=256 n=500000 work=fill
+fill: alloc+touch 41.0 ns/op, free (random order) 57.5 ns/op, corrupt=0
+  full           rss=   129.8 MB  live=   122.1 MB  ratio= 1.06 
+  after free all rss=    96.5 MB  live=     0.0 MB  ratio= 0.00 
+## layout=malloc slot=256 n=500000 work=churn
+config: layout=malloc first=12 cap=12 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=256 n=500000 work=churn
+churn: 39.5 ns per free+alloc pair, corrupt=0
+  after churn    rss=   129.8 MB  live=   122.1 MB  ratio= 1.06 
+## layout=malloc slot=256 n=500000 work=mixed
+config: layout=malloc first=12 cap=12 (chunk 1024..1024 KB) policy=lowest contract=madvise spare=1 slot=256 n=500000 work=mixed
+mixed: 17.6 ns/step, short live=500000, immortal=49741
+  steady state   rss=   142.7 MB  live=   134.2 MB  ratio= 1.06 
+  after burst    rss=   142.7 MB  live=    12.1 MB  ratio=11.75 (immortals only live)
+## layout=malloc slot=1024 n=125000 work=fill
+config: layout=malloc first=12 cap=12 (chunk 4096..4096 KB) policy=lowest contract=madvise spare=1 slot=1024 n=125000 work=fill
+fill: alloc+touch 139.6 ns/op, free (random order) 47.3 ns/op, corrupt=0
+  full           rss=   124.0 MB  live=   122.1 MB  ratio= 1.02 
+  after free all rss=   124.0 MB  live=     0.0 MB  ratio= 0.00 
+## layout=malloc slot=1024 n=125000 work=churn
+config: layout=malloc first=12 cap=12 (chunk 4096..4096 KB) policy=lowest contract=madvise spare=1 slot=1024 n=125000 work=churn
+churn: 48.6 ns per free+alloc pair, corrupt=0
+  after churn    rss=   124.1 MB  live=   122.1 MB  ratio= 1.02 
+## layout=malloc slot=1024 n=125000 work=mixed
+config: layout=malloc first=12 cap=12 (chunk 4096..4096 KB) policy=lowest contract=madvise spare=1 slot=1024 n=125000 work=mixed
+mixed: 56.4 ns/step, short live=125000, immortal=12392
+  steady state   rss=   136.3 MB  live=   134.2 MB  ratio= 1.02 
+  after burst    rss=   136.3 MB  live=    12.1 MB  ratio=11.27 (immortals only live)
+## layout=malloc slot=64 n=2000000 work=ramp pattern=random
+config: layout=malloc first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(random): live after free=200000 (10%), corrupt=0
+  full           rss=   152.6 MB  live=   122.1 MB  ratio= 1.25 
+  after free 90% rss=   152.6 MB  live=    12.2 MB  ratio=12.50 
+  after refill   rss=   152.6 MB  live=    73.2 MB  ratio= 2.08 
+  after free all rss=   152.6 MB  live=     0.0 MB  ratio= 0.00 
+## layout=malloc slot=64 n=2000000 work=ramp pattern=fifo
+config: layout=malloc first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(fifo): live after free=200000 (10%), corrupt=0
+  full           rss=   152.6 MB  live=   122.1 MB  ratio= 1.25 
+  after free 90% rss=   152.6 MB  live=    12.2 MB  ratio=12.50 
+  after refill   rss=   152.6 MB  live=    73.2 MB  ratio= 2.08 
+  after free all rss=   152.6 MB  live=     0.0 MB  ratio= 0.00 
+## layout=malloc slot=64 n=2000000 work=ramp pattern=group
+config: layout=malloc first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=2000000 work=ramp
+ramp(group): live after free=200000 (10%), corrupt=0
+  full           rss=   152.6 MB  live=   122.1 MB  ratio= 1.25 
+  after free 90% rss=   152.6 MB  live=    12.2 MB  ratio=12.50 
+  after refill   rss=   152.6 MB  live=    73.2 MB  ratio= 2.08 
+  after free all rss=   152.6 MB  live=     0.0 MB  ratio= 0.00 
+## layout=reserve slot=64 n=1000000 work=deref
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=lowest contract=madvise spare=1 slot=64 n=1000000 work=deref
+deref (sequential order), ns per access:
+  raw pointer            1.60
+  index, contiguous      0.83
+  index, chunk table     1.31
+  index, geometric clz   1.84
+  index+generation       1.15  (stale=0)
+deref (random order), ns per access:
+  raw pointer            3.22
+  index, contiguous      2.95
+  index, chunk table     5.78
+  index, geometric clz   6.97
+  index+generation       6.60  (stale=0)
+  chunks=0 decommits=0 commits=0
+## DONE

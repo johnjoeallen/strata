@@ -1,0 +1,124 @@
+## layout=reserve first=10 cap=10 policy=recent contract=madvise mag=0 n=2000000 work=compact
+config: layout=reserve first=10 cap=10 (chunk 64..64 KB) policy=recent contract=madvise spare=1 slot=64 mag=0 n=2000000 work=compact
+compact: n=2000000, live short=1400000 after 30% random kill
+  after kill     rss=   122.1 MB  live=    85.4 MB  ratio= 1.43 
+  churn 1n       rss=   122.2 MB  live=    87.9 MB  ratio= 1.39 
+  churn 3n       rss=   122.2 MB  live=    92.8 MB  ratio= 1.32 
+  churn 6n       rss=   103.0 MB  live=   100.1 MB  ratio= 1.03 
+  35.2 ns/step
+  after burst    rss=   100.2 MB  live=    14.6 MB  ratio= 6.85 (immortals only live)
+  chunks=1954 decommits=1996 commits=0
+## layout=reserve first=10 cap=10 policy=recent contract=madvise mag=16 n=2000000 work=compact
+config: layout=reserve first=10 cap=10 (chunk 64..64 KB) policy=recent contract=madvise spare=1 slot=64 mag=16 n=2000000 work=compact
+compact: n=2000000, live short=1400000 after 30% random kill
+  after kill     rss=   122.2 MB  live=    85.4 MB  ratio= 1.43 
+  churn 1n       rss=   122.3 MB  live=    87.9 MB  ratio= 1.39 
+  churn 3n       rss=   122.3 MB  live=    92.8 MB  ratio= 1.32 
+  churn 6n       rss=   122.3 MB  live=   100.1 MB  ratio= 1.22 
+  9.6 ns/step
+  after burst    rss=    49.8 MB  live=    14.6 MB  ratio= 3.40 (immortals only live)
+  chunks=1954 decommits=1952 commits=0
+## layout=reserve first=10 cap=10 policy=recent contract=madvise mag=64 n=2000000 work=compact
+config: layout=reserve first=10 cap=10 (chunk 64..64 KB) policy=recent contract=madvise spare=1 slot=64 mag=64 n=2000000 work=compact
+compact: n=2000000, live short=1400000 after 30% random kill
+  after kill     rss=   122.1 MB  live=    85.4 MB  ratio= 1.43 
+  churn 1n       rss=   122.2 MB  live=    87.9 MB  ratio= 1.39 
+  churn 3n       rss=   122.2 MB  live=    92.8 MB  ratio= 1.32 
+  churn 6n       rss=   122.2 MB  live=   100.1 MB  ratio= 1.22 
+  9.7 ns/step
+  after burst    rss=    52.2 MB  live=    14.6 MB  ratio= 3.57 (immortals only live)
+  chunks=1954 decommits=1952 commits=0
+## layout=reserve first=10 cap=10 policy=recent contract=madvise mag=256 n=2000000 work=compact
+config: layout=reserve first=10 cap=10 (chunk 64..64 KB) policy=recent contract=madvise spare=1 slot=64 mag=256 n=2000000 work=compact
+compact: n=2000000, live short=1400000 after 30% random kill
+  after kill     rss=   122.1 MB  live=    85.4 MB  ratio= 1.43 
+  churn 1n       rss=   122.2 MB  live=    87.9 MB  ratio= 1.39 
+  churn 3n       rss=   122.2 MB  live=    92.8 MB  ratio= 1.32 
+  churn 6n       rss=   122.2 MB  live=   100.1 MB  ratio= 1.22 
+  9.8 ns/step
+  after burst    rss=    61.7 MB  live=    14.6 MB  ratio= 4.22 (immortals only live)
+  chunks=1954 decommits=1952 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=0 n=2000000 work=compact
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=0 n=2000000 work=compact
+compact: n=2000000, live short=1400000 after 30% random kill
+  after kill     rss=   122.1 MB  live=    85.4 MB  ratio= 1.43 
+  churn 1n       rss=   122.1 MB  live=    87.9 MB  ratio= 1.39 
+  churn 3n       rss=   122.1 MB  live=    92.8 MB  ratio= 1.32 
+  churn 6n       rss=   110.2 MB  live=   100.1 MB  ratio= 1.10 
+  36.7 ns/step
+  after burst    rss=   100.4 MB  live=    14.6 MB  ratio= 6.86 (immortals only live)
+  chunks=489 decommits=491 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=16 n=2000000 work=compact
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=16 n=2000000 work=compact
+compact: n=2000000, live short=1400000 after 30% random kill
+  after kill     rss=   122.1 MB  live=    85.4 MB  ratio= 1.43 
+  churn 1n       rss=   122.1 MB  live=    87.9 MB  ratio= 1.39 
+  churn 3n       rss=   122.1 MB  live=    92.8 MB  ratio= 1.32 
+  churn 6n       rss=   122.1 MB  live=   100.1 MB  ratio= 1.22 
+  9.7 ns/step
+  after burst    rss=    52.6 MB  live=    14.6 MB  ratio= 3.60 (immortals only live)
+  chunks=489 decommits=487 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=64 n=2000000 work=compact
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=64 n=2000000 work=compact
+compact: n=2000000, live short=1400000 after 30% random kill
+  after kill     rss=   122.1 MB  live=    85.4 MB  ratio= 1.43 
+  churn 1n       rss=   122.1 MB  live=    87.9 MB  ratio= 1.39 
+  churn 3n       rss=   122.1 MB  live=    92.8 MB  ratio= 1.32 
+  churn 6n       rss=   122.1 MB  live=   100.1 MB  ratio= 1.22 
+  9.6 ns/step
+  after burst    rss=    62.9 MB  live=    14.6 MB  ratio= 4.30 (immortals only live)
+  chunks=489 decommits=487 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=256 n=2000000 work=compact
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=256 n=2000000 work=compact
+compact: n=2000000, live short=1400000 after 30% random kill
+  after kill     rss=   122.1 MB  live=    85.4 MB  ratio= 1.43 
+  churn 1n       rss=   122.1 MB  live=    87.9 MB  ratio= 1.39 
+  churn 3n       rss=   122.1 MB  live=    92.8 MB  ratio= 1.32 
+  churn 6n       rss=   122.1 MB  live=   100.1 MB  ratio= 1.22 
+  9.6 ns/step
+  after burst    rss=    88.9 MB  live=    14.6 MB  ratio= 6.07 (immortals only live)
+  chunks=489 decommits=487 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=0 n=2000000 work=churn
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=0 n=2000000 work=churn
+churn: 39.3 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=489 decommits=488 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=0 n=2000000 work=fill
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=0 n=2000000 work=fill
+fill: alloc+touch 10.6 ns/op, free (random order) 30.6 ns/op, corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     0.3 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=488 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=16 n=2000000 work=churn
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=16 n=2000000 work=churn
+churn: 17.8 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=489 decommits=487 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=16 n=2000000 work=fill
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=16 n=2000000 work=fill
+fill: alloc+touch 10.8 ns/op, free (random order) 23.8 ns/op, corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=     4.1 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=473 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=64 n=2000000 work=churn
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=64 n=2000000 work=churn
+churn: 18.9 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=489 decommits=487 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=64 n=2000000 work=fill
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=64 n=2000000 work=fill
+fill: alloc+touch 11.0 ns/op, free (random order) 16.9 ns/op, corrupt=0
+  full           rss=   122.1 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=    15.6 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=427 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=256 n=2000000 work=churn
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=256 n=2000000 work=churn
+churn: 17.5 ns per free+alloc pair, corrupt=0
+  after churn    rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  chunks=489 decommits=487 commits=0
+## layout=reserve first=12 cap=12 policy=recent contract=madvise mag=256 n=2000000 work=fill
+config: layout=reserve first=12 cap=12 (chunk 256..256 KB) policy=recent contract=madvise spare=1 slot=64 mag=256 n=2000000 work=fill
+fill: alloc+touch 10.6 ns/op, free (random order) 15.9 ns/op, corrupt=0
+  full           rss=   122.2 MB  live=   122.1 MB  ratio= 1.00 
+  after free all rss=    49.6 MB  live=     0.0 MB  ratio= 0.00 
+  chunks=489 decommits=291 commits=0

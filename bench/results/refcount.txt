@@ -1,0 +1,55 @@
+impl=plain  scn=own share=0.00 threads= 1     1335.6 Mpairs/s total     0.75 ns/pair/thread
+impl=atomic scn=own share=0.00 threads= 1      138.2 Mpairs/s total     7.24 ns/pair/thread
+impl=biased scn=own share=0.00 threads= 1     2189.4 Mpairs/s total     0.46 ns/pair/thread
+impl=atomic scn=hot share=0.00 threads= 1      138.1 Mpairs/s total     7.24 ns/pair/thread
+impl=biased scn=hot share=0.00 threads= 1     2296.9 Mpairs/s total     0.44 ns/pair/thread
+impl=atomic scn=mix share=0.01 threads= 1      138.2 Mpairs/s total     7.24 ns/pair/thread
+impl=biased scn=mix share=0.01 threads= 1     1728.8 Mpairs/s total     0.58 ns/pair/thread
+impl=atomic scn=mix share=0.10 threads= 1      138.1 Mpairs/s total     7.24 ns/pair/thread
+impl=biased scn=mix share=0.10 threads= 1     1732.3 Mpairs/s total     0.58 ns/pair/thread
+impl=atomic scn=mix share=0.50 threads= 1      138.1 Mpairs/s total     7.24 ns/pair/thread
+impl=biased scn=mix share=0.50 threads= 1     1731.0 Mpairs/s total     0.58 ns/pair/thread
+impl=plain  scn=own share=0.00 threads= 2     2680.0 Mpairs/s total     0.75 ns/pair/thread
+impl=atomic scn=own share=0.00 threads= 2      275.8 Mpairs/s total     7.25 ns/pair/thread
+impl=biased scn=own share=0.00 threads= 2     4298.4 Mpairs/s total     0.47 ns/pair/thread
+impl=atomic scn=hot share=0.00 threads= 2      103.3 Mpairs/s total    19.36 ns/pair/thread
+impl=biased scn=hot share=0.00 threads= 2      345.9 Mpairs/s total     5.78 ns/pair/thread
+impl=atomic scn=mix share=0.01 threads= 2      263.9 Mpairs/s total     7.58 ns/pair/thread
+impl=biased scn=mix share=0.01 threads= 2     1336.3 Mpairs/s total     1.50 ns/pair/thread
+impl=atomic scn=mix share=0.10 threads= 2      198.6 Mpairs/s total    10.07 ns/pair/thread
+impl=biased scn=mix share=0.10 threads= 2      431.5 Mpairs/s total     4.64 ns/pair/thread
+impl=atomic scn=mix share=0.50 threads= 2      126.0 Mpairs/s total    15.87 ns/pair/thread
+impl=biased scn=mix share=0.50 threads= 2      119.9 Mpairs/s total    16.68 ns/pair/thread
+impl=plain  scn=own share=0.00 threads= 4     5334.0 Mpairs/s total     0.75 ns/pair/thread
+impl=atomic scn=own share=0.00 threads= 4      550.7 Mpairs/s total     7.26 ns/pair/thread
+impl=biased scn=own share=0.00 threads= 4     8435.3 Mpairs/s total     0.47 ns/pair/thread
+impl=atomic scn=hot share=0.00 threads= 4       98.2 Mpairs/s total    40.75 ns/pair/thread
+impl=biased scn=hot share=0.00 threads= 4      189.1 Mpairs/s total    21.15 ns/pair/thread
+impl=atomic scn=mix share=0.01 threads= 4      491.1 Mpairs/s total     8.14 ns/pair/thread
+impl=biased scn=mix share=0.01 threads= 4     2301.9 Mpairs/s total     1.74 ns/pair/thread
+impl=atomic scn=mix share=0.10 threads= 4      330.6 Mpairs/s total    12.10 ns/pair/thread
+impl=biased scn=mix share=0.10 threads= 4      483.2 Mpairs/s total     8.28 ns/pair/thread
+impl=atomic scn=mix share=0.50 threads= 4      154.2 Mpairs/s total    25.93 ns/pair/thread
+impl=biased scn=mix share=0.50 threads= 4       94.8 Mpairs/s total    42.20 ns/pair/thread
+impl=plain  scn=own share=0.00 threads= 8    10372.3 Mpairs/s total     0.77 ns/pair/thread
+impl=atomic scn=own share=0.00 threads= 8     1096.9 Mpairs/s total     7.29 ns/pair/thread
+impl=biased scn=own share=0.00 threads= 8    16131.8 Mpairs/s total     0.50 ns/pair/thread
+impl=atomic scn=hot share=0.00 threads= 8       94.8 Mpairs/s total    84.41 ns/pair/thread
+impl=biased scn=hot share=0.00 threads= 8      115.0 Mpairs/s total    69.55 ns/pair/thread
+impl=atomic scn=mix share=0.01 threads= 8     1003.6 Mpairs/s total     7.97 ns/pair/thread
+impl=biased scn=mix share=0.01 threads= 8     3534.4 Mpairs/s total     2.26 ns/pair/thread
+impl=atomic scn=mix share=0.10 threads= 8      545.7 Mpairs/s total    14.66 ns/pair/thread
+impl=biased scn=mix share=0.10 threads= 8      710.8 Mpairs/s total    11.26 ns/pair/thread
+impl=atomic scn=mix share=0.50 threads= 8      244.6 Mpairs/s total    32.71 ns/pair/thread
+impl=biased scn=mix share=0.50 threads= 8      106.7 Mpairs/s total    75.00 ns/pair/thread
+impl=plain  scn=own share=0.00 threads=16    19811.1 Mpairs/s total     0.81 ns/pair/thread
+impl=atomic scn=own share=0.00 threads=16     2026.2 Mpairs/s total     7.90 ns/pair/thread
+impl=biased scn=own share=0.00 threads=16    23482.9 Mpairs/s total     0.68 ns/pair/thread
+impl=atomic scn=hot share=0.00 threads=16       68.7 Mpairs/s total   233.05 ns/pair/thread
+impl=biased scn=hot share=0.00 threads=16       58.3 Mpairs/s total   274.30 ns/pair/thread
+impl=atomic scn=mix share=0.01 threads=16     1779.1 Mpairs/s total     8.99 ns/pair/thread
+impl=biased scn=mix share=0.01 threads=16     5986.4 Mpairs/s total     2.67 ns/pair/thread
+impl=atomic scn=mix share=0.10 threads=16      696.7 Mpairs/s total    22.97 ns/pair/thread
+impl=biased scn=mix share=0.10 threads=16      715.7 Mpairs/s total    22.36 ns/pair/thread
+impl=atomic scn=mix share=0.50 threads=16      212.5 Mpairs/s total    75.28 ns/pair/thread
+impl=biased scn=mix share=0.50 threads=16      109.0 Mpairs/s total   146.76 ns/pair/thread

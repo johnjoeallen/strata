@@ -1,0 +1,33 @@
+// runtime/ring.stra - a fixed-capacity circular queue. Generic: it knows nothing about requests or completion.
+// C counterpart: none as a type. The concurrent server keeps its ring of in-flight requests inline in conc_step (server.c).
+import runtime.leaves
+
+// Ring<T> is only a container: a fixed-capacity circular queue. It knows nothing about requests or completion.
+// Its storage comes from a pool (256 B for depth 32), so a connection with nothing in flight owns none.
+struct Ring<T> {
+    slots: T?[]
+    head: usize = 0
+    count: usize = 0
+
+    static fn withCapacity(n: usize): Ring<T> { return Ring { slots: T?[](n) } }   // n null slots, from the worker's ring pool
+    fn length(): usize { return count }
+    fn isEmpty(): bool { return count == 0 }
+    // A FIFO queue: push adds at the back, front() looks at the oldest entry, pop() removes it.
+    fn push(v: T) {   // the caller checks length() < capacity
+        assert(count < slots.length)
+        self.slots[(head + count) % slots.length] = v
+        self.count++
+    }
+    fn front(): T?& {   // the oldest entry, or null
+        if (count == 0) return null
+        return slots[head]
+    }
+    fn pop(): T {
+        let v = slots[head]
+        assert(v != null)                                    // cannot fail while count > 0; assert narrows v to T
+        self.slots[head] = null                              // the slot no longer owns it
+        self.head = (head + 1) % slots.length
+        self.count--
+        return v
+    }
+}

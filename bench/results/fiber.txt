@@ -1,0 +1,25 @@
+mode=pool n=100000 stack_kb=16 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=16384 vmas=1 create_ns=617 start_ns=566 switch_ns=58.1 teardown_ns=132
+mode=pool n=100000 stack_kb=64 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=65536 vmas=1 create_ns=545 start_ns=610 switch_ns=59.8 teardown_ns=128
+mode=pool n=100000 stack_kb=256 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=262144 vmas=1 create_ns=547 start_ns=509 switch_ns=100.9 teardown_ns=142
+mode=pool n=100000 stack_kb=1024 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=1048576 vmas=1 create_ns=658 start_ns=547 switch_ns=102.4 teardown_ns=236
+mode=poolguard n=100000 stack_kb=16 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=20480 vmas=200000 create_ns=1778 start_ns=707 switch_ns=53.0 teardown_ns=1093
+mode=poolguard n=100000 stack_kb=64 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=69632 vmas=200000 create_ns=1729 start_ns=720 switch_ns=59.0 teardown_ns=1141
+mode=poolguard n=100000 stack_kb=256 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=266240 vmas=200000 create_ns=1917 start_ns=739 switch_ns=89.4 teardown_ns=1214
+mode=poolguard n=100000 stack_kb=1024 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=1052672 vmas=200000 create_ns=2060 start_ns=801 switch_ns=68.8 teardown_ns=1261
+mode=each n=100000 stack_kb=16 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=20480 vmas=200000 create_ns=2028 start_ns=693 switch_ns=52.1 teardown_ns=1699
+mode=each n=100000 stack_kb=64 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=69632 vmas=200000 create_ns=2129 start_ns=711 switch_ns=62.6 teardown_ns=2013
+mode=each n=100000 stack_kb=256 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=266240 vmas=200000 create_ns=2056 start_ns=763 switch_ns=78.8 teardown_ns=2232
+mode=each n=100000 stack_kb=1024 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=1052672 vmas=200000 create_ns=2287 start_ns=747 switch_ns=80.9 teardown_ns=2387
+mode=malloc n=100000 stack_kb=16 touch_kb=4 thp=0 rss_per_fiber_B=8321 vsz_per_fiber_B=16400 vmas=0 create_ns=572 start_ns=506 switch_ns=29.6 teardown_ns=133
+mode=malloc n=100000 stack_kb=64 touch_kb=4 thp=0 rss_per_fiber_B=8321 vsz_per_fiber_B=65551 vmas=0 create_ns=587 start_ns=518 switch_ns=28.9 teardown_ns=149
+mode=malloc n=100000 stack_kb=256 touch_kb=4 thp=0 rss_per_fiber_B=13616 vsz_per_fiber_B=264834 vmas=0 create_ns=1492 start_ns=537 switch_ns=49.4 teardown_ns=1144
+mode=malloc n=100000 stack_kb=1024 touch_kb=4 thp=0 rss_per_fiber_B=13617 vsz_per_fiber_B=1051266 vmas=0 create_ns=1558 start_ns=538 switch_ns=52.6 teardown_ns=1261
+mode=pool n=100000 stack_kb=64 touch_kb=4 thp=1 rss_per_fiber_B=65553 vsz_per_fiber_B=65536 vmas=1 create_ns=2940 start_ns=107 switch_ns=47.1 teardown_ns=71
+mode=pool n=100000 stack_kb=1024 touch_kb=4 thp=1 rss_per_fiber_B=968462 vsz_per_fiber_B=1048576 vmas=1 create_ns=42904 start_ns=148 switch_ns=53.1 teardown_ns=920
+mode=pool n=100000 stack_kb=256 touch_kb=1 thp=0 rss_per_fiber_B=4113 vsz_per_fiber_B=262144 vmas=1 create_ns=595 start_ns=109 switch_ns=102.5 teardown_ns=114
+mode=pool n=100000 stack_kb=256 touch_kb=4 thp=0 rss_per_fiber_B=8209 vsz_per_fiber_B=262144 vmas=1 create_ns=575 start_ns=515 switch_ns=99.1 teardown_ns=167
+mode=pool n=100000 stack_kb=256 touch_kb=16 thp=0 rss_per_fiber_B=20497 vsz_per_fiber_B=262144 vmas=1 create_ns=560 start_ns=1990 switch_ns=96.0 teardown_ns=333
+mode=pool n=100000 stack_kb=256 touch_kb=64 thp=0 rss_per_fiber_B=69649 vsz_per_fiber_B=262144 vmas=1 create_ns=573 start_ns=8147 switch_ns=99.2 teardown_ns=1016
+mode=pool n=1000000 stack_kb=64 touch_kb=4 thp=0 rss_per_fiber_B=8208 vsz_per_fiber_B=65536 vmas=1 create_ns=518 start_ns=507 switch_ns=61.6 teardown_ns=121
+FAILED: poolguard 1000000 64 4 5 0
+mode=malloc n=1000000 stack_kb=64 touch_kb=4 thp=0 rss_per_fiber_B=8320 vsz_per_fiber_B=65552 vmas=0 create_ns=650 start_ns=541 switch_ns=67.3 teardown_ns=254

@@ -1,0 +1,7 @@
+## after splitting server.c / server.stra into runtime/ and http/ layers (1 worker, 16 conns)
+concurrent, always spawn, K=16 | rps=4112258 | first_resp_us mean=62 max=4044
+concurrent, always spawn, K=16 | rps=4206464 | first_resp_us mean=60 max=1763
+concurrent, always spawn, K=16 | rps=4144123 | first_resp_us mean=61 max=325
+concurrent inline, K=1          | rps=306977 | first_resp_us mean=0 max=0
+sequential, K=1                 | rps=312805 | first_resp_us mean=0 max=0
+parking 200 us, K=16, 16 conns  | rps=799340 | first_resp_us mean=320 max=2017

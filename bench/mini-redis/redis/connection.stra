@@ -1,0 +1,72 @@
+// redis/connection.stra - the connection's input reader. Original: connection.rs (BytesMut + read_buf + parse_frame).
+// Same shape as http/reader.stra: the buffer comes from the runtime's size classes only while there is unconsumed input, so an idle connection
+// owns none; it grows class by class up to Limits.maxFrame and no further. There is ONE non-parking read; a loop that must also wait on a
+// mailbox or on shutdown uses the same call, and waits with waitAny when it says Idle.
+import runtime.leaves
+import redis.types
+import redis.frame
+import redis.limits
+
+struct Reader {
+    conn: Conn&
+    lim: Limits&
+    buf: u8[]? = null
+    start: usize = 0
+    end: usize = 0
+    scanner: Scanner = Scanner {}
+    args: Args? = null                                   // pooled; held only while a frame is arriving or being handled
+    len: usize = 0                                      // length of the frame returned last; finish() consumes it
+
+    static fn of(conn: Conn&, lim: Limits&): Reader { return Reader { conn: conn, lim: lim } }
+
+    // The next complete command frame, if one can be had without waiting: Input.Frame (the offsets are in `args`), Idle, or Closed.
+    // Closed means EOF at a frame boundary; EOF in the middle of a frame is an IoError (the original: "connection reset by peer").
+    fn tryNextFrame(): Input throws IoError, ProtocolError, FrameTooLarge {
+        while (true) {
+            if (buf != null && end > start) {
+                if (args == null) self.args = argsPool.get()
+                let r = scanner.advance(buf[start..end], args, lim)
+                switch (r) {
+                    Done(n) -> { self.len = n; return Input.Frame }
+                    More(needed) -> { if (!makeRoom(needed)) throw FrameTooLarge() }
+                }
+            } else if (buf == null) {
+                if (!conn.readableHint()) return Input.Idle        // idle: allocate nothing
+                self.buf = u8[](); self.start = 0; self.end = 0
+            }
+            let n = conn.tryRecv(buf[end..buf.capacity])           // never parks
+            if (n == null) {
+                if (end == start) self.buf = null              // a spurious wake read nothing: do not sit on the buffer while idle
+                return Input.Idle
+            }
+            if (n == 0) {
+                if (end > start) throw IoError()
+                self.buf = null
+                return Input.Closed
+            }
+            self.end += n
+        }
+    }
+
+    // The frame is handled: drop its bytes (no copy) and get ready for the next. Any argument view is dead after this.
+    fn finish() {
+        self.start += len
+        self.scanner.reset()
+        self.args = null                                  // back to the pool
+        if (start == end) self.buf = null                 // drained: back to the pool
+    }
+
+    fn frame(): Args& { assert(args != null); return args }   // the arguments of the frame Input.Frame announced
+    fn bytes(a: Arg&): u8[]& { return buf[start + a.start..start + a.end] }
+    fn readable(): Wakeup { return conn.readableWakeup() }
+
+    // Room for `needed` bytes counted from `start`: compact, then grow class by class. false: that is over maxFrame.
+    fn makeRoom(needed: usize): bool {
+        if (needed > lim.maxFrame) return false
+        if (start > 0 && (end == buf.capacity || needed > buf.capacity)) {
+            buf.moveWithin(start..end, 0); self.end -= start; self.start = 0
+        }
+        while (buf.capacity < needed) buf.grow()
+        return true
+    }
+}

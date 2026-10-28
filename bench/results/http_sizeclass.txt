@@ -1,0 +1,25 @@
+## connections mid-request (partial header, no terminator), 20,000 held, 4 workers
+fixed 2 KB buffer (before)    partial=60B  conns=20000  server RSS delta=40 MB  = 2136 B/conn
+size classes (512 B first)    partial=60B  conns=20000  server RSS delta=11 MB  = 600 B/conn
+size classes, conc=1          partial=60B  conns=20000  server RSS delta=13 MB  = 688 B/conn
+fixed 2 KB buffer (before)    partial=1500B  conns=20000  server RSS delta=40 MB  = 2136 B/conn
+size classes (512 B first)    partial=1500B  conns=20000  server RSS delta=40 MB  = 2137 B/conn
+size classes, conc=1          partial=1500B  conns=20000  server RSS delta=0 MB  = 0 B/conn
+size classes, 10 KB partial   partial=10000B  conns=20000  server RSS delta=236 MB  = 12379 B/conn
+## size-class server (after) vs fixed 2 KB server (before), same session. 1 worker, 16 conns
+before (fixed 2 KB) conc, K=16     conns=16 K=16 | rps=4116371 | first_resp_us mean=62 max=962 | batch_done p50=61
+after  (size classes) conc, K=16   conns=16 K=16 | rps=4091766 | first_resp_us mean=62 max=1259 | batch_done p50=61
+before (fixed 2 KB) conc, K=16     conns=16 K=16 | rps=4090431 | first_resp_us mean=62 max=563 | batch_done p50=61
+after  (size classes) conc, K=16   conns=16 K=16 | rps=4116090 | first_resp_us mean=62 max=5430 | batch_done p50=61
+before (fixed 2 KB) conc, K=16     conns=16 K=16 | rps=4088211 | first_resp_us mean=62 max=784 | batch_done p50=61
+after  (size classes) conc, K=16   conns=16 K=16 | rps=4090810 | first_resp_us mean=62 max=3922 | batch_done p50=61
+before sequential K=1              conns=16 K=1 | rps=314632 | first_resp_us mean=0 max=0 | batch_done p50=50
+after  sequential K=1              conns=16 K=1 | rps=306900 | first_resp_us mean=0 max=0 | batch_done p50=50
+before concurrent K=1              conns=16 K=1 | rps=299915 | first_resp_us mean=0 max=0 | batch_done p50=52
+after  concurrent K=1              conns=16 K=1 | rps=299267 | first_resp_us mean=0 max=0 | batch_done p50=52
+before sequential K=1              conns=16 K=1 | rps=308329 | first_resp_us mean=0 max=0 | batch_done p50=50
+after  sequential K=1              conns=16 K=1 | rps=309319 | first_resp_us mean=0 max=0 | batch_done p50=50
+before concurrent K=1              conns=16 K=1 | rps=299681 | first_resp_us mean=0 max=0 | batch_done p50=52
+after  concurrent K=1              conns=16 K=1 | rps=301102 | first_resp_us mean=0 max=0 | batch_done p50=52
+before parking 200us K=16          conns=16 K=16 | rps=802746 | first_resp_us mean=318 max=5722 | batch_done p50=319
+after  parking 200us K=16          conns=16 K=16 | rps=804458 | first_resp_us mean=318 max=5460 | batch_done p50=319
