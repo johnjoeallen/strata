@@ -1,0 +1,40 @@
+// http/types.stra - the vocabulary of the HTTP library: requests, responses, methods, route costs, read results, exceptions.
+// C counterpart: http/http_msg.h (Resp), http/http_reader.h, and the tag values in server.c.
+import runtime.leaves
+
+struct Resp  { bytes: u8[]&, keepAlive: bool }          // static text built at startup, or built by the handler
+struct Request { start: usize, end: usize }              // offsets of the head inside the reader's buffer, not a pointer
+                                                         // (the buffer may move when it grows; see results/http.md)
+exception TooLarge                                       // the header block does not fit in the buffer
+exception PayloadTooLarge                                // the request body is over its route's limit
+exception BadBody                                        // malformed body framing: Content-Length together with chunked, a bad or repeated number, a bad chunk
+
+enum Method { Get, Head, Post, Put, Delete }
+
+// A route's declared cost. A handler cannot be interrupted, so the library needs this BEFORE it runs one.
+enum Cost {
+    Bounded(Duration)        // expected to finish, or park, within this long
+    Unbounded                // may run long without parking (CPU-bound)
+
+    fn isUnbounded(): bool {
+        switch (self) {
+            Unbounded -> { return true }
+            Bounded(_) -> { return false }
+        }
+    }
+}
+
+// The result of a non-blocking read of the next request head.
+enum Input {
+    Head(Request)            // a complete request head is available
+    Idle                     // nothing to read right now
+    Closed                   // the peer closed its side and nothing complete is left
+}
+
+
+// How a connection loop ended. The caller decides how to close from this (runConnection).
+enum Ending {
+    ClientClosed             // the peer closed it, or it failed: nothing more can arrive
+    ServerClosed             // the server ended it after a normal answer (Connection: close, HTTP/1.0)
+    ServerRejected           // the server ended it with an ERROR answer (431, 413, 400, 501): the client is probably still sending
+}

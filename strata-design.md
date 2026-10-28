@@ -36,7 +36,7 @@ Strata explores retaining those ideas where useful while supporting:
       defers, batches, retries, or reorders on the programmer's behalf. `conn.write` sends now; buffering is an
       explicit type with an explicit `flush`.
     - Optimizations that change timing or cost, such as response batching or write coalescing, are library features
-      that are opt-in, state their bounds (for example `max_batch` and `max_hold`), and document what they delay.
+      that are opt-in, state their bounds (for example `maxBatch` and `maxHold`), and document what they delay.
       The runtime and compiler may not introduce them silently. A time bound checked between handlers cannot
       interrupt a running handler (there is no preemption), so such features also require handlers to declare
       whether they are bounded before anything is held behind them.
@@ -184,7 +184,7 @@ Strata aims for Java-virtual-thread-style programming: thousands of logical task
 fn serve(listener: Listener&) {
     loop {
         let socket = listener.accept();
-        vthread_spawn(handle_client, socket);
+        vthreadSpawn(handleClient, socket);
     }
 }
 ```
@@ -245,20 +245,20 @@ Requested ordering policy: fair FIFO admission of access requests, batching cons
 Application code should not need to write synchronization blocks for each cache operation:
 
 ```cpp
-fn cache_get(cache: Ref<Cache>, key: i64) -> i64 {
+fn cacheGet(cache: Ref<Cache>, key: i64) -> i64 {
     sync(cache) {
         return cache.entries.get(key); // scalar copied before unlock
     }
 }
 
-fn cache_put(cache: Ref<Cache>, key: i64, value: i64) {
+fn cachePut(cache: Ref<Cache>, key: i64, value: i64) {
     mutate(cache) {
         cache.entries.insert(key, value);
     }
 }
 ```
 
-Callers use `cache_get` and `cache_put` like ordinary functions. Read-modify-write actions require their own atomic API operation, not a separate get followed by put. Encapsulation also requires module visibility/access-control rules to prevent bypassing protected operations.
+Callers use `cacheGet` and `cachePut` like ordinary functions. Read-modify-write actions require their own atomic API operation, not a separate get followed by put. Encapsulation also requires module visibility/access-control rules to prevent bypassing protected operations.
 
 `Ref<T>` governs object *lifetime*; `sync` and `mutate` govern *concurrent access*. Neither substitutes for the other.
 
@@ -271,7 +271,7 @@ A narrower alternative is explicit `shared var` / `shared let` declarations at m
 Consider typed `qput` / `qget` message passing inspired by Goose. A possible incremental extension adds addressed messages and request/reply correlation:
 
 ```cpp
-let pending = qput(cache_owner, CacheRequest { key: 100 });
+let pending = qput(cacheOwner, CacheRequest { key: 100 });
 let reply = pending.response<CacheReply>();
 
 // Owner side:
@@ -309,7 +309,7 @@ A resource type may define an automatically invoked cleanup method. The exact ow
 2. **Ref thread safety:** Should all `Ref<T>` counts be atomic by default, or may compiler-proven confinement use a non-atomic implementation? Migration from local to shared ownership must be safe.
 3. **Access model:** Is `sync`/`mutate` required for all `Ref<T>` objects, or only those that may cross tasks? How is shareability proven or declared?
 4. **Arrays:** When should a growable array use a dedicated virtual region rather than a relocatable managed buffer? How are thousands of independently sized arrays represented?
-   *Direction chosen for small bounded buffers (prototyped in `bench/c/http`):* the runtime provides `u8[]` as a pooled size-class array
+   *Direction chosen for small bounded buffers (prototyped in `bench/http`, `stra/http`, `c/generated/http`):* the runtime provides `u8[]` as a pooled size-class array
    (512 B, 2 KB, 8 KB, 16 KB in the prototype). It starts in the smallest class, compacts when full, and `grow()` copies it into the
    next class; the source states no size, only a limit where one matters (a maximum header block). Code that needs a stable
    address must use offsets (a request is a pair of offsets), so moving is safe. Large and unbounded arrays (bodies, big
@@ -330,7 +330,7 @@ Dedicated virtual reservations, as in Goose, remain the candidate for large in-m
    requires f to declare no `throws`, so a vthread's root function handles its own errors. Open: how a throw interacts with a
    scope that still has child vthreads (the prototype source assumes the scope waits for them first), and whether a handler
    type such as `fn(u8[]&): Resp throws Exception` is the right way to say "may throw anything".
-   *Syntax direction (illustrative, used in `bench/c/http/server.stra`):* nullable `T?` with null-check narrowing instead of an
+   *Syntax direction (illustrative, used in `stra/http/server.stra`):* nullable `T?` with null-check narrowing instead of an
    Option type; methods declared inside the type, with `self` available but optional (needed only to disambiguate a member from
    a parameter and to refer to the value itself); tagged enums with an exhaustive `switch` whose arms are `Pattern -> { ... }` (no `case` keyword, no fallthrough, commas to list several
    values, `default` required for non-enum switches; ranges, guards, bindings and destructuring deferred) (`enum Cost { Bounded(Duration) Unbounded }`);

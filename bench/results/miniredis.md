@@ -1,6 +1,6 @@
 # mini-redis in Strata/C: measurements
 
-Server: `bench/mini-redis/server` (the C a Strata compiler would emit for `server.stra`), cores 0..N-1. Load generator: `loadgen_resp`, cores 8.., same machine, loopback
+Server: `bench/redis/server` (built from `c/generated/redis/server.c`, the C a Strata compiler would emit for `stra/redis/server.stra`), cores 0..N-1. Load generator: `loadgen_resp`, cores 8.., same machine, loopback
 (Ryzen 9 9950X3D, Linux 6.12, gcc 14.2). Raw output: `miniredis_c.txt`, `miniredis_c_lock.txt`; scripts `run_bench.sh`, `run_bench_lock.sh`. 4 s per point after 0.5 s warm-up,
 one run per point unless noted. **There is no comparison with the original Rust server: building it was blocked (third-party crates), and the user chose to skip the baseline.**
 Numbers are therefore absolute, not relative; the closest reference is the HTTP server's sequential C path (301-310k req/s, 1 core).

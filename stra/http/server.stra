@@ -1,0 +1,252 @@
+// server.stra - the HTTP server itself: the route table, the handlers, and the connection loops. Everything else is a library:
+//   runtime/*.stra   the runtime's interface and generic pieces        (C: runtime/*.h)
+//   http/*.stra      the HTTP library: messages, reader, bodies, routes (C: http/*.h)
+// C counterpart of this file: server.c. Syntax conventions, tags and the file map are in README.md.
+//
+// Reading order: the route table and handlers, handleSequential (one request at a time), handlePipelined (the default: pipelined requests run
+// concurrently, responses in order), then runConnection, serve and main.
+import runtime.leaves
+import runtime.io
+import runtime.ring
+import http.types
+import http.config
+import http.response
+import http.route
+import http.body
+import http.reader
+import http.pipeline
+
+let routes = [
+    Route.get ("/",           index,  Cost.Bounded(20us)),      // server.c: GET /            (spin_work, optional sleep)
+    Route.get ("/echo/:n",    echo,   Cost.Bounded(1ms)),       // server.c: GET /echo/N?s=US (parks for s microseconds)
+    Route.get ("/slow",       report, Cost.Unbounded),          // server.c: GET /slow        (~1 ms of CPU, no parking)
+    Route.post("/",           save,   Cost.Unbounded),          // server.c: POST /           (unsafe: a barrier both ways)
+    Route.postApi("/api",     receive,    Cost.Bounded(1ms)),   // server.c: POST /api        the standard reader, in memory, capped at maxBody
+    Route.postApi("/users",   createUser, Cost.Bounded(5ms)),   // a JSON form parsed into a value: same reader, same small cap
+    Route.upload("/upload",   storeUpload, Cost.Unbounded, 4.gb),  // server.c: POST /upload  the upload reader, file-backed, uploadmax=
+    Route.upload("/import",   importRows,  Cost.Unbounded, 2.gb),  // a huge document: spooled, then mapped and streamed
+]
+
+fn index(head: u8[]&): Resp { return ok(HELLO) }
+
+fn echo(head: u8[]&): Resp {
+    sleep(queryUs(head))   // stands in for a DB call
+    return ok(pathParam(head) + "\n")
+}
+
+fn report(head: u8[]&): Resp { return ok(expensiveSummary()) }   // long, but never parks
+
+fn save(head: u8[]&): Resp { return ok(HELLO) }   // server.c: POST / has no body and changes no state;
+                                                  //     it exists to be an UNSAFE request (a barrier)
+
+// Handlers that take a body. Which reader ran decided where it lives.
+fn receive(head: u8[]&, body: Body&): Resp {   // server.c: POST /api
+    return ok("stored " + body.length() + " bytes in memory crc32=" + hex(body.digest()) + "\n")
+}
+
+fn createUser(head: u8[]&, body: Body&): Resp throws Exception {
+    // The standard reader capped this body (maxBody, 1 MB by default) and holds all of it in memory. The parser has its own limits as
+    // well: a small body can still be a deeply nested one.
+    let user = json.parse<User>(body.bytes(), JsonLimits { maxDepth: 32, maxStringBytes: 4096 })
+    return created(users.insert(user))
+}
+
+fn storeUpload(head: u8[]&, upload: Upload&): Resp {   // server.c: POST /upload
+    return ok("stored " + upload.length() + " bytes in file crc32=" + hex(upload.digest()) + "\n")
+}
+
+fn importRows(head: u8[]&, upload: Upload&): Resp throws Exception {   // (CPU-bound over a big input: declared Unbounded)
+    // The body is already a file; the handler never holds the document as a value. It maps the file and runs a streaming parser over it,
+    // so memory stays constant however large the upload is.
+    let rows = json.stream<Row>(upload.map())
+    var n = 0
+    for (row in rows) { importer.add(row); n++ }
+    return ok("imported " + n + " rows\n")
+}
+
+// The route lookup is pure, so no frame (server.c: route(), is_post(), is_slow()). null: no such route.
+fn lookup(head: u8[]&): Route? { return routes.find(head) }
+
+// Runs a handler. An exception that escapes it becomes a 500 response and the connection survives. Used inline and as the
+// body of every child. It catches everything, so it declares no `throws` and can be spawned.
+
+// ---------- one request at a time (the baseline: server.c with conc=0) ----------
+// The handler never sees a buffer, a length or a move. Everything buffer-related lives in Reader.
+fn handleSequential(conn: Conn, table: ResponseTable&, cfg: ServerConfig&): Ending throws IoError {
+    var input = Reader.of(conn, cfg)
+    var ending = Ending.ClientClosed
+    while (true) {
+        var req: Request?
+        try {
+            req = input.nextRequest()   // parks while idle or mid-request
+        } catch (e: TooLarge) {
+            writeAll(conn, table.headersTooLarge.bytes)
+            ending = Ending.ServerRejected
+            break
+        }
+        if (req == null) break                               // the client closed the connection
+        let head = input.head(req)
+        let route = lookup(head)
+        if (route != null && !route.handler.isPlain()) {                                           // bodies are read by handlePipelined only
+            writeAll(conn, table.notImplemented.bytes)
+            ending = Ending.ServerRejected
+            break
+        }
+        let resp = (route == null) ? table.notFound : runHandler(route, head, Payload.NoPayload, table)   // the handler may park
+        writeAll(conn, resp.bytes)   // parks if the send buffer is full
+        if (!resp.keepAlive) { ending = Ending.ServerClosed; break }
+        input.releaseIfDrained()
+    }
+    return ending
+}   // `input` returns its buffer when this function ends, normally or by an exception; the caller closes `conn` (runConnection)
+
+
+// ---------- pipelined requests run concurrently, responses sent in order (the default; server.c conc=1) ----------
+// RFC 7230 6.3.2: a server MAY process pipelined requests in parallel if all are safe, but MUST send the responses in
+// request order. Each request is a child vthread of the connection's scope. The connection sends the contiguous
+// COMPLETED PREFIX of responses as one write every time it runs. Nothing is held on purpose: a response waits only behind
+// an earlier request that has not finished, which the ordering rule requires. No timers, no maxHold, no opt-in flag.
+//
+//   * depth: at most `depth` requests are in flight; the connection stops reading beyond that.
+//   * barriers: an unsafe request starts only when nothing is in flight, and nothing starts behind it until it has
+//     finished; an unbounded route starts only when nothing is in flight (so what is complete is sent first).
+//   * structure: the scope waits for every child, also when an exception leaves it, so a child never outlives the frame it
+//     reports to. Cancellation is not modelled: children run to completion.
+//   * each spawned child gets its OWN COPY of the request head (`head.copy()`, explicit, a few hundred bytes): the reader's
+//     buffer moves on as the connection consumes and compacts input, so a view into it would dangle. The inline path passes
+//     the view directly, because the handler finishes before anything else touches the buffer.
+//   * inline: one request with nothing pipelined behind it and nothing in flight runs directly in the connection's frame
+//     (no spawn). Same behaviour, less work; this is why K=1 traffic is within ~3% of the sequential loop.
+//   * measured (results/http.md): instant handlers cost the same as batching (4.2M req/s, 16 pipelined, one worker);
+//     200 us parking handlers: the last response of 16 arrives after 265 us instead of 4.08 ms; a CPU-bound handler on a
+//     pinned worker is NOT sped up (it still occupies the worker), only prevented from delaying earlier responses.
+//   * memory: connection frame 176 B incl. task header (88 B for 5a); each in-flight request adds a 104 B child, a copy of its head
+//     (256 B block, or a size-class array for a larger head), a 256 B ring (from a pool, only while requests are in flight) and a transient
+//     output buffer.
+fn handlePipelined(conn: Conn, table: ResponseTable&, cfg: ServerConfig&): Ending throws IoError {
+    var input = Reader.of(conn, cfg)
+    let depth = cfg.depth
+    scope {                                                  // children are tied to this scope
+        var inflight = InFlight.of(depth)                    // its ring storage comes from a pool; unallocated while nothing is in flight
+        var closing = false                                  // no more requests are admitted once the connection will close
+        var peerClosed = false                               // the client closed its side
+        var rejected = false                                 // the connection ends with an error answer
+        while (true) {
+            // (a) collect the completed prefix, in request order
+            let prefix = inflight.takeCompletedPrefix()
+            // (b) send it as one write
+            if (!prefix.isEmpty()) {
+                writeAll(conn, prefix.bytes())   // an IoError ends the connection; the scope still waits for its children
+                if (prefix.endsWithClose()) break
+                continue                                     // more may have finished, or the output buffer was full: collect again
+            }
+            // (c) admit new requests
+            try {
+                admission: while (!closing && inflight.length() < depth) {
+                    switch (input.tryNextRequest()) {
+                        Idle   -> { break admission }                            // nothing to read right now
+                        Closed -> { closing = true; peerClosed = true; break admission }   // the peer closed; what is in flight still finishes
+                        Head(req) -> {
+                            let head = input.head(req)
+                            let route = lookup(head)
+                            if (route == null) {                                 // unknown route: answer 404 and close
+                                input.consume(req)
+                                inflight.push(Task.completed(table.notFound))
+                                closing = true
+                                break admission
+                            }
+                            if (!inflight.admits(route)) break admission         // barrier rules above; leaves the request unconsumed
+                            input.consume(req)
+                            if (!keepsAlive(head)) closing = true
+                            switch (route.handler) {
+                                Plain(_) -> {
+                                    if (!Framing.parse(head).isNoBody()) throw BadBody()           // a body nobody asked for: refuse it and close
+                                    if (inflight.isEmpty() && !input.hasCompleteRequest()) {
+                                        inflight.push(Task.completed(runHandler(route, head, Payload.NoPayload, table)))   // inline: runs in this frame
+                                    } else {
+                                        inflight.push(spawn runHandler(route, head.copy(), Payload.NoPayload, table))   // child vthread, own copy of the head
+                                    }
+                                }
+                                Api(_) -> {
+                                    // The route is unsafe, so the barrier above means this is the only request in flight. This task reads the
+                                    // body itself, parking while the client sends. Reading moves the buffer, so the handler gets its own copy
+                                    // of the head.
+                                    let ownHead = head.copy()
+                                    let body = input.readBody(head, cfg.maxBody)   // may throw PayloadTooLarge, BadBody
+                                    inflight.push(Task.completed(runHandler(route, ownHead, Payload.Mem(body), table)))
+                                }
+                                Upload(limit, _) -> {
+                                    let ownHead = head.copy()
+                                    let upload = input.readUpload(head, min(limit, cfg.uploadMax))
+                                    inflight.push(Task.completed(runHandler(route, ownHead, Payload.Spooled(upload), table)))
+                                }
+                            }
+                            if (!route.safe) inflight.markUnsafe()
+                        }
+                    }
+                }
+            } catch (e: TooLarge) {
+                inflight.push(Task.completed(table.headersTooLarge))
+                closing = true; rejected = true
+            } catch (e: PayloadTooLarge) {                       // the body is only partly read: answer 413 and close
+                inflight.push(Task.completed(table.payloadTooLarge))
+                closing = true; rejected = true
+            } catch (e: BadBody) {
+                inflight.push(Task.completed(table.badRequest))
+                closing = true; rejected = true
+            }
+            input.releaseIfDrained()   // idle: no buffer
+            // (d) finished, or wait for input and/or a child to finish
+            if (inflight.hasFinished()) continue             // an inline or already-finished request: collect it, do not park
+            if (inflight.isEmpty() && closing) break
+            waitAny(input.readable(), inflight.childFinished())
+        }
+    }   // leaving the scope waits for any remaining children
+    if (peerClosed) return Ending.ClientClosed
+    return rejected ? Ending.ServerRejected : Ending.ServerClosed
+}
+
+
+// ---------- accepting and starting ----------
+// The root of a connection's vthread. `spawn` needs a function that throws nothing, so this is where a reset or a failed
+// write is handled: it ends this connection only.
+fn runConnection(conn: Conn, table: ResponseTable&, cfg: ServerConfig&) {
+    var ending = Ending.ClientClosed
+    try {
+        ending = handlePipelined(conn, table, cfg)
+    } catch (e: IoError) {
+        log(e)                                                                                     // the connection failed: a plain close
+    }
+    // Closing a socket that still holds unread input makes the kernel send a RESET, which can destroy the response before the client reads it or make
+    // the client's next write fail so that it never looks for the answer (a client that writes its whole request and then reads). So when the SERVER ends
+    // a connection, the connection is handed to a lingering closer. The policy is stated here, not hidden in the runtime: always after an error answer
+    // (the client is probably still sending), and after a plain Connection: close only if input is still unread. A client that has sent everything is
+    // closed directly and pays nothing. Cleanup never parks; lingerClose is a hand-off, so this function still returns at once.
+    switch (ending) {
+        ClientClosed   -> {}
+        ServerClosed   -> { if (conn.hasUnread()) conn.lingerClose(cfg.lingerTime, cfg.lingerBytes) }
+        ServerRejected -> { conn.lingerClose(cfg.lingerTime, cfg.lingerBytes) }
+    }
+}   // lingerClose consumes `conn`; otherwise it is closed here
+
+fn serve(listener: Listener, table: ResponseTable&, cfg: ServerConfig&) throws IoError {   // one per worker (not measured)
+    while (true) {
+        let conn = listener.accept()   // parks until a client arrives
+        spawn runConnection(conn, table, cfg)   // `conn` moves into the new vthread; its frame comes from the task arena
+    }
+}
+
+fn main(port: u16, workers: usize) {
+    let table = ResponseTable.build()
+    let cfg = ServerConfig()                                                                       // the defaults; the host can change any field
+    for (core in 0..workers) {
+        spawnWorker(core, fn() {                                                                   // the worker's root: throws nothing
+            try {
+                serve(Listener.bindReusePort(port), table, cfg)                                     // one listener, run queue, timer heap, arenas per core
+            } catch (e: IoError) {
+                log(e)
+                exit(1)
+            }
+        })
+    }
+}

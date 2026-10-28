@@ -1,6 +1,6 @@
 # HTTP server: C-as-the-compiler-would-emit vs Tokio
 
-Code: `c/http/{rt.h,server.c,server.stra,loadgen.c,run_scale.sh}`, `rust/src/bin/http_server.rs`. Raw data: `http_scale.txt`.
+Code: `c/runtime/rt.h`, `c/generated/http/server.c`, `stra/http/server.stra`, `bench/http/{loadgen.c,run_scale.sh}`, `rust/src/bin/http_server.rs`. Raw data: `http_scale.txt`.
 
 ## What was built
 * `server.c` is hand-written to look like compiler output for `server.stra` (blocking-style `handle`/`serve`):
@@ -452,7 +452,7 @@ Remaining gaps: bytes a client sends after a plain close that had nothing pendin
 simultaneous hostile lingerers each cost a task slot and a socket for up to `linger=` (not capped in number); `lingerClose` is a hand-off to the runtime, not something a
 program can wait on.
 
-## Code organisation: runtime and HTTP libraries separate from the server (`bench/c/http/README.md`)
+## Code organisation: runtime and HTTP libraries separate from the server (`bench/http/README.md`)
 `server.stra` and `server.c` used to hold everything (about 1,000 lines each). They are now split into layers so each file contains only what belongs to it, and
 anything that can be written in Strata is a `.stra` file, with C used only for what needs the operating system or the scheduler:
 * `runtime/`: `leaves.stra` (the runtime's interface: signatures only), `io.stra` (`writeAll`), `ring.stra` (`Ring<T>`); C: `rt.h` (tasks, pools, scheduler, timers),
