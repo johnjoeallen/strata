@@ -7,7 +7,7 @@ Nothing here compiles Strata yet; the `.stra` files are the source as it would b
 strata-design.md     the design specification
 stra/                Strata source only
   runtime/             the runtime's interface and the parts writable in Strata
-  http/                HTTP library and server.stra
+  http/                HTTP library and server.stra; styles/{cpp,java,mixed}/server.stra are the same server in three syntax styles
   redis/               mini-redis library and server.stra
   experiments/         handler classification study (older syntax)
 c/                   C only
