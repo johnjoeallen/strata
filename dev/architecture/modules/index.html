@@ -1398,7 +1398,7 @@
 
 
 <h1 id="compiled-modules-and-application-linking">Compiled modules and application linking<a class="headerlink" href="#compiled-modules-and-application-linking" title="Permanent link">&para;</a></h1>
-<p>A <strong>compiled Strata module</strong> (working extension <code>.smod</code>; a bundle of them is an archive, <code>.sar</code>) is what a library ships and what an application consumes. It carries enough to type-check, lifetime-check, effect-check and optimise a program against it <strong>without the original source</strong>. Names and extensions are placeholders.</p>
+<p>A <strong>compiled Strata module</strong> (working extension <code>.smod</code>; a bundle of them is an archive, <code>.sar</code>) is the compiled form of one source <em>package</em> (the files that declare the same <code>package name</code>, see <a href="../open-decisions/#d14-packages-and-imports">D14</a>); the module takes the package's name. It is what a library ships and what an application consumes. It carries enough to type-check, lifetime-check, effect-check and optimise a program against it <strong>without the original source</strong>. Names and extensions are placeholders.</p>
 <h2 id="1-three-tiers-of-information">1. Three tiers of information<a class="headerlink" href="#1-three-tiers-of-information" title="Permanent link">&para;</a></h2>
 <p>The module separates what is needed for correctness from what only enables optimisation. A consumer can drop a higher tier and still get a correct program.</p>
 <table>
@@ -1658,14 +1658,14 @@ per type field:                 mutability = write-once | mutable
 <p>Not a reason to recompile M: a change in an imported function's body that leaves its contract hash alone (in incremental mode); a change in an unreferenced export.</p>
 <p><strong>Ripple of effect changes (the main risk).</strong> If <code>net.Conn.send</code> becomes <code>May</code> where it was <code>Never</code>, every caller's contract and generated code change, and so does every caller's callers when their own summary widens. The ripple is bounded by the call graph, and stops wherever a <code>nopark</code> tag or an already-<code>May</code> function absorbs it. The module compile prints the contract diff so the cause is visible; this is the same visibility the ownership metadata already needs.</p>
 <h2 id="7-cross-module-propagation-example">7. Cross-module propagation, example<a class="headerlink" href="#7-cross-module-propagation-example" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>module net      export Conn.recv       Park=May   foreign=nonblocking    hash n1
+<div class="highlight"><pre><span></span><code>package net      export Conn.recv       Park=May   foreign=nonblocking    hash n1
                 export Conn.close      Park=Never                         hash n2
 
-module db       import net.Conn.recv@n1
+package db       import net.Conn.recv@n1
                 export query           Park=May (via net.Conn.recv)       hash d1
                 export escape          Park=Never                         hash d2
 
-module app      import db.query@d1, db.escape@d2
+package app      import db.query@d1, db.escape@d2
                 handle()   -&gt; Park=May      (via db.query)   inferred; nothing written
                 render()   -&gt; Park=Never
 </code></pre></div>

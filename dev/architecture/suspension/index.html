@@ -1577,7 +1577,7 @@
 <li>Entering <code>sync</code>/<code>mutate</code> (it queues FIFO, see spec 7.1). The body of the block can never park, so a lock is never held across a suspension.</li>
 <li>A call to a function whose summary is <code>May</code>, or <code>Cond(P)</code> with a member of <code>P</code> bound to something that may park.</li>
 <li>A call through an interface or function value whose declared bound permits parking (see <a href="../dispatch-and-ffi/#interface-calls">dispatch</a>).</li>
-<li>A <strong>compiler-inserted budget check</strong>, only in a function that asks for one with <code>[yield]</code>, directly or through a file-level default (section 1.1). The check sits on loop back-edges and recursive-call entries of that function's own body; when the budget is exhausted the task yields, which is an ordinary park point. Without <code>[yield]</code> the compiler inserts nothing.</li>
+<li>A <strong>compiler-inserted budget check</strong>, only in a function that asks for one with <code>[yield]</code>, on the function itself or through its type or package (section 1.1). The check sits on loop back-edges and recursive-call entries of that function's own body; when the budget is exhausted the task yields, which is an ordinary park point. Without <code>[yield]</code> the compiler inserts nothing.</li>
 <li>A call to a blocking foreign function that the runtime offloads (see <a href="../dispatch-and-ffi/#blocking-foreign-calls">blocking FFI</a>).</li>
 </ol>
 <p>Cleanup methods are <code>Never</code> by rule (spec section 9). A cleanup that tries to call a <code>May</code> function is a compile error, which is already the behaviour for <code>sync</code>/<code>mutate</code> bodies.</p>
@@ -1612,7 +1612,7 @@
 <tbody>
 <tr>
 <td>none</td>
-<td>none, unless the file says <code>[yield]</code></td>
+<td>none, unless an enclosing type or package says <code>[yield]</code></td>
 <td>inferred</td>
 <td>The default: nothing inserted</td>
 </tr>
@@ -1624,9 +1624,9 @@
 </tr>
 <tr>
 <td><code>[noyield]</code></td>
-<td>none, even if the file says <code>[yield]</code></td>
+<td>none, even if an enclosing type or package says <code>[yield]</code></td>
 <td>inferred</td>
-<td>Overrides a file-level default</td>
+<td>Overrides an enclosing default</td>
 </tr>
 <tr>
 <td><code>[nopark]</code></td>
@@ -1637,16 +1637,52 @@
 </tbody>
 </table>
 <ul>
-<li><strong>File-level default.</strong> A <code>[yield]</code> line at the top of a file (placeholder spelling) makes it the default for every function in the file. <code>[noyield]</code> or <code>[nopark]</code> on a function overrides it. A CPU-heavy module marks itself once and tags its hot, bounded helpers.</li>
-<li><strong>Own body only.</strong> <code>[yield]</code> does not make callees yield. It is shorthand for a <code>yield()</code> every N iterations of the function's own loops. Its callers become <code>May</code> by ordinary inference.</li>
-<li><strong>The effect widens only if a check is inserted.</strong> A <code>[yield]</code> function with no loop or recursion stays <code>Never</code>; tagging it causes no ripple.</li>
-<li><strong>What a check is:</strong> a counter decrement and a rarely taken branch. On exhaustion the task goes to the back of the run queue and resumes in its turn: a park point, so live values are spilled to a frame as for any park. A check is also a cancellation point, so a task in a <code>[yield]</code> loop can be cancelled (section 4).</li>
-<li><strong>Cost control (Direction):</strong> strip-mine loops so the counter is tested once per block of iterations; omit the check for loops with a small constant bound. Neither is guaranteed. The overhead is a measurement to take, not assume (benchmarks B13).</li>
-<li><strong><code>[nopark]</code> is the strict form.</strong> It is the only form that guarantees the function is <code>Never</code>. <code>[noyield]</code> still permits a call to <code>recv</code>. It is an optional assertion, never required, and never mentioned by callers; it turns a silent effect change into a compile error at a library boundary.</li>
-<li><strong>Lambdas</strong> inherit the setting of the enclosing function (<strong>Open</strong>).</li>
-<li><strong><code>[yield]</code> is not the <code>yield()</code> call.</strong> <code>yield()</code> is an <code>extern parks fn</code> the program calls itself. The attribute only lets the compiler insert yields.</li>
-<li><strong>Limits:</strong> the budget bounds how long a <em>checked</em> region runs. It does not bound a function without <code>[yield]</code>, a plain <code>extern fn</code>, or a single indivisible library operation. Such code stalls its worker and cannot be cancelled until it returns. The loop warnings in 1.3 exist to find it.</li>
+<li><strong>Where an attribute can be written, and precedence.</strong> The innermost level wins, and the same three attributes work at every level:</li>
 </ul>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Written as</th>
+<th>Applies to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Function</td>
+<td><code>fn[yield] parse()</code></td>
+<td>its own body</td>
+</tr>
+<tr>
+<td>Type</td>
+<td><code>struct Parser[yield] { ... }</code></td>
+<td>the methods declared in it</td>
+</tr>
+<tr>
+<td>Package</td>
+<td><code>package[yield] imaging</code>, in one file of the package</td>
+<td>every function in the package</td>
+</tr>
+<tr>
+<td>Default</td>
+<td>nothing written</td>
+<td>nothing inserted</td>
+</tr>
+</tbody>
+</table>
+<p>A CPU-heavy type marks itself once and tags its hot, bounded helpers <code>[noyield]</code>. A <code>[nopark]</code> type asserts that none of its methods can park; a method can still override it, and the override is then reported at the method. Files are not a level: a file is a layout accident.
+- <strong>Package.</strong> Every source file starts with <code>package name</code>; the files that share a name form one package, which compiles to one <code>.smod</code> named after it (placeholder syntax; the rules are in <a href="../open-decisions/#d14-packages-and-imports">D14</a>). The package default is written on the package declaration, <code>package[yield] imaging</code>, in exactly one file of the package (by convention <code>package.stra</code>); every other file writes a plain <code>package imaging</code>, and an attribute there is an error. Source files therefore carry no conflicting settings.
+- <strong>Resolved at definition.</strong> The compiler resolves each function's effective attribute when it compiles the defining package, and the IR carries the resolved value. A generic instantiated in another package keeps the setting of the package that defined it; settings are never inherited by importers. The package default is part of the module's input hash: changing it recompiles the package and its effect changes ripple as usual.
+- <strong>Tooling must show the effective setting and its source</strong> (function, type or package) in hover, because it is no longer visible at the function itself. That is the cost of having levels.
+- <strong>Spelling.</strong> The attribute follows <code>fn</code> on a function and the name on a type, which differ; whether to unify them (<code>fn f[yield]</code>) is <strong>Open</strong>.
+- <strong>Own body only.</strong> <code>[yield]</code> does not make callees yield. It is shorthand for a <code>yield()</code> every N iterations of the function's own loops. Its callers become <code>May</code> by ordinary inference.
+- <strong>The effect widens only if a check is inserted.</strong> A <code>[yield]</code> function with no loop or recursion stays <code>Never</code>; tagging it causes no ripple.
+- <strong>What a check is:</strong> a counter decrement and a rarely taken branch. On exhaustion the task goes to the back of the run queue and resumes in its turn: a park point, so live values are spilled to a frame as for any park. A check is also a cancellation point, so a task in a <code>[yield]</code> loop can be cancelled (section 4).
+- <strong>Cost control (Direction):</strong> strip-mine loops so the counter is tested once per block of iterations; omit the check for loops with a small constant bound. Neither is guaranteed. The overhead is a measurement to take, not assume (benchmarks B13).
+- <strong><code>[nopark]</code> is the strict form.</strong> It is the only form that guarantees the function is <code>Never</code>. <code>[noyield]</code> still permits a call to <code>recv</code>. It is an optional assertion, never required, and never mentioned by callers; it turns a silent effect change into a compile error at a library boundary.
+- <strong>Lambdas</strong> inherit the setting of the enclosing function (<strong>Open</strong>).
+- <strong><code>[yield]</code> is not the <code>yield()</code> call.</strong> <code>yield()</code> is an <code>extern parks fn</code> the program calls itself. The attribute only lets the compiler insert yields.
+- <strong>Limits:</strong> the budget bounds how long a <em>checked</em> region runs. It does not bound a function without <code>[yield]</code>, a plain <code>extern fn</code>, or a single indivisible library operation. Such code stalls its worker and cannot be cancelled until it returns. The loop warnings in 1.3 exist to find it.</p>
 <h3 id="12-calls-allowed-in-syncmutate-bodies-cleanups-and-c-callbacks">1.2 Calls allowed in <code>sync</code>/<code>mutate</code> bodies, cleanups and C callbacks<a class="headerlink" href="#12-calls-allowed-in-syncmutate-bodies-cleanups-and-c-callbacks" title="Permanent link">&para;</a></h3>
 <p>These regions may not park, so they may call only functions whose effect is <code>Never</code>.</p>
 <p>Allowed:</p>
@@ -1664,7 +1700,7 @@
 <li>Entering another <code>sync</code>/<code>mutate</code>, unless that object is in the same head.</li>
 <li>A call through an interface or function value whose declared bound is not <code>Never</code> (the default bound is <code>May</code>).</li>
 </ul>
-<p>Inside such a region a <code>[yield]</code> marking is ignored for the region's own loops: no check is inserted there, and a file-level <code>[yield]</code> does not apply.</p>
+<p>Inside such a region a <code>[yield]</code> marking is ignored for the region's own loops: no check is inserted there, and a type- or package-level <code>[yield]</code> does not apply.</p>
 <p><strong>Why a body may not park</strong> (the rule is a design choice, not a technical limit; frames could hold a lock):</p>
 <ol>
 <li><em>Hold time stays bounded by the code in the block.</em> A holder parked on a socket keeps the lock while every other vthread queues; with FIFO fairness one waiting writer also blocks the readers behind it.</li>
@@ -1676,7 +1712,7 @@
 <p>What it costs: no I/O under a lock (copy out, release, then act, as <code>Db.get</code> and <code>Db.set</code> do), and long work under a lock must be chunked (<code>purgeExpired</code> removes at most <code>PURGE_BATCH</code> keys per hold).</p>
 <h3 id="13-loop-warnings">1.3 Loop warnings<a class="headerlink" href="#13-loop-warnings" title="Permanent link">&para;</a></h3>
 <p>A lint, not a proof. Termination is undecidable, so these are warnings and never errors.</p>
-<p><strong>Classification.</strong> Each loop gets a class, and each function gets a <code>loops</code> class in its summary, composed over its callees by the same rules as nested loops:</p>
+<p><strong>Classification.</strong> Each loop gets a class, and each function gets a <code>loops</code> class in its summary, composed over its callees by the same rules as nested loops. The class describes <em>uninterrupted</em> work: a loop whose body contains a park point (a call to any <code>May</code> function, a <code>[yield]</code> check, <code>yield()</code>, a lock entry) contributes <code>none</code>, because every iteration gives the scheduler a chance. <code>purgeExpired</code> in <code>stra/redis/db.stra</code> is the example: its outer loop yields, and the inner loop under the lock is bounded by a counter against a constant.</p>
 <table>
 <thead>
 <tr>
@@ -1717,7 +1753,9 @@
 <p><strong>Known limits.</strong> It will miss unbounded work inside loops that look bounded, flag some bounded loops it cannot prove bounded, and sees foreign and indirect calls only as stated.</p>
 <h3 id="example-attributes-sync-and-loop-warnings">Example: attributes, <code>sync</code> and loop warnings<a class="headerlink" href="#example-attributes-sync-and-loop-warnings" title="Permanent link">&para;</a></h3>
 <p>Illustrative Strata source and C. Neither is compiler output.</p>
-<div class="highlight"><pre><span></span><code><span class="c1">// Opted in: the compiler inserts a budget check in this loop. May, yields only.</span>
+<div class="highlight"><pre><span></span><code><span class="n">package</span><span class="w"> </span><span class="n">http</span>
+
+<span class="c1">// Opted in: the compiler inserts a budget check in this loop. May, yields only.</span>
 <span class="n">fn</span><span class="p">[</span><span class="n">yield</span><span class="p">]</span><span class="w"> </span><span class="n">parseHeaders</span><span class="p">(</span><span class="n">buf</span><span class="o">:</span><span class="w"> </span><span class="n">u8</span><span class="p">[]</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">Headers</span><span class="w"> </span><span class="k">throws</span><span class="w"> </span><span class="n">BadRequest</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">var</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Headers</span><span class="p">();</span>
 <span class="w">    </span><span class="n">var</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
@@ -1758,10 +1796,18 @@
 <span class="w">    </span><span class="p">}</span><span class="w">                                </span><span class="c1">//   tight -&gt; scanForever</span>
 <span class="p">}</span>
 </code></pre></div>
-<p>A file that starts with the file-level default:</p>
-<div class="highlight"><pre><span></span><code><span class="p">[</span><span class="n">yield</span><span class="p">]</span><span class="w">                              </span><span class="c1">// placeholder spelling: every function below defaults to [yield]</span>
-<span class="n">fn</span><span class="w"> </span><span class="n">render</span><span class="p">(</span><span class="n">page</span><span class="o">:</span><span class="w"> </span><span class="n">Page</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">string</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">blocks</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// gets checks</span>
-<span class="n">fn</span><span class="p">[</span><span class="n">noyield</span><span class="p">]</span><span class="w"> </span><span class="n">crc</span><span class="p">(</span><span class="n">data</span><span class="o">:</span><span class="w"> </span><span class="n">u8</span><span class="p">[]</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">                          </span><span class="c1">// override: plain C</span>
+<p>A type that opts in as a whole, and a package that sets the default for its files (<code>package.stra</code> is the one file that may carry package attributes):</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// imaging/package.stra</span>
+<span class="n">package</span><span class="p">[</span><span class="n">noyield</span><span class="p">]</span><span class="w"> </span><span class="n">imaging</span><span class="w">         </span><span class="c1">// the package default; here it restates that nothing is inserted</span>
+
+<span class="c1">// imaging/renderer.stra</span>
+<span class="n">package</span><span class="w"> </span><span class="n">imaging</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">Renderer</span><span class="p">[</span><span class="n">yield</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">fn</span><span class="w"> </span><span class="nf">render</span><span class="p">(</span><span class="n">page</span><span class="o">:</span><span class="w"> </span><span class="n">Page</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">string</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">blocks</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// gets checks: the type says [yield]</span>
+<span class="w">    </span><span class="n">fn</span><span class="p">[</span><span class="n">noyield</span><span class="p">]</span><span class="w"> </span><span class="n">crc</span><span class="p">(</span><span class="n">data</span><span class="o">:</span><span class="w"> </span><span class="n">u8</span><span class="p">[]</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">                          </span><span class="c1">// override: plain C</span>
+<span class="w">    </span><span class="n">fn</span><span class="p">[</span><span class="n">nopark</span><span class="p">]</span><span class="w"> </span><span class="n">width</span><span class="p">(</span><span class="n">c</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">128</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span><span class="w">          </span><span class="c1">// asserts it never parks</span>
+<span class="p">}</span>
 </code></pre></div>
 <p>Inferred effects and summary fields:</p>
 <div class="highlight"><pre><span></span><code>hash          Never   loops=bounded   (no attribute, no checks)
@@ -1883,15 +1929,16 @@ status = DONE | THROWN | PARKED
 <p>Frames come from a per-function arena, sized exactly. This matches the existing per-type arena rule and the <code>frames_bench</code> model; idle parked task cost there was 137 B with no state and 393 B at depth 4, against a 4 KB floor for a stackful fiber (Measured, hand-written).</p>
 <p><strong>Frames never move</strong> (Direction). A frame address is stable from creation to destruction. This removes the <code>Pin</code> problem Rust async has, and lets other code hold pointers into a frame.</p>
 <h3 id="pseudocode">Pseudocode<a class="headerlink" href="#pseudocode" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>// module db (compiled separately)         Park(query) = May   (calls Conn.recv)
-fn query(sql: string&amp;, id: i64) -&gt; Row throws DbError {
+<div class="highlight"><pre><span></span><code>package db                                  // compiled separately         Park(query) = May   (calls Conn.recv)
+fn query(sql: string&amp;, id: i64): Row throws DbError {
     let c = pool.acquire();                 // May: waits for a free connection
     c.send(encode(sql, id));                // May
     return decode(c.recv());                // May
 }
 
-// module app
-fn handle(req: Request&amp;) -&gt; Response throws DbError {
+package app
+import db
+fn handle(req: Request&amp;): Response throws DbError {
     let row = db.query("select ...", req.id);   // inferred May; nothing written
     return render(row);                         // Never
 }

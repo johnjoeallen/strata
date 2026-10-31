@@ -969,6 +969,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#d14-packages-and-imports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D14. Packages and imports
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1263,6 +1274,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#d14-packages-and-imports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D14. Packages and imports
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1328,8 +1350,8 @@
 <h2 id="d12-cancellation-as-a-non-exception">D12. Cancellation as a non-exception<a class="headerlink" href="#d12-cancellation-as-a-non-exception" title="Permanent link">&para;</a></h2>
 <p>Recommended: not in <code>throws</code>, not catchable, runs cleanups. Alternative: a catchable exception that must be rethrown. Interacts with the exception model (spec 10.7), and with child-vthread scopes.</p>
 <h2 id="d13-runaway-non-parking-code">D13. Runaway non-parking code<a class="headerlink" href="#d13-runaway-non-parking-code" title="Permanent link">&para;</a></h2>
-<p><strong>Decided by the author:</strong> the compiler inserts budget checks only in functions marked <code>[yield]</code>, or in a file whose default is <code>[yield]</code>. <code>[noyield]</code> overrides the file default; <code>[nopark]</code> asserts that nothing parks. With no attribute nothing is inserted. Mechanism and rules: <a href="../suspension/#11-attributes-yield-noyield-nopark">suspension 1.1</a>. Loops add no effect by default, so the library-tagging burden an earlier default-on design carried is gone.</p>
-<p>The price is that unmarked CPU-bound code can stall a worker and cannot be cancelled. Mitigations, all Direction: loop warnings with an advisory <code>loops</code> class in the module summary (<a href="../suspension/#13-loop-warnings">suspension 1.3</a>), a watchdog diagnostic that reports a worker making no progress past a threshold and names the function it is in (it reports and does not interrupt), and the file-level default for CPU-heavy modules.</p>
+<p><strong>Decided by the author:</strong> the compiler inserts budget checks only in functions marked <code>[yield]</code>, or in a type (<code>struct Parser[yield]</code>) or, once packages exist, a package whose default is <code>[yield]</code>. The innermost level wins: function, then type, then package. <code>[noyield]</code> overrides an enclosing default; <code>[nopark]</code> asserts that nothing parks. With no attribute nothing is inserted. Mechanism and rules: <a href="../suspension/#11-attributes-yield-noyield-nopark">suspension 1.1</a>. Loops add no effect by default, so the library-tagging burden an earlier default-on design carried is gone.</p>
+<p>The price is that unmarked CPU-bound code can stall a worker and cannot be cancelled. Mitigations, all Direction: loop warnings with an advisory <code>loops</code> class in the module summary (<a href="../suspension/#13-loop-warnings">suspension 1.3</a>), a watchdog diagnostic that reports a worker making no progress past a threshold and names the function it is in (it reports and does not interrupt), and the type-level (later package-level) default for CPU-heavy code. Open: the package notion itself, and whether the attribute spelling should be unified between functions and types.</p>
 <p>Still open:</p>
 <ul>
 <li><strong>Overhead of a check</strong> in a <code>[yield]</code> loop. Unmeasured; strip-mining and small-bound elision are expected to keep it low. Benchmark B13.</li>
@@ -1337,6 +1359,16 @@
 <li><strong>Lambdas</strong> inheriting the enclosing function's setting.</li>
 <li><strong>Default revisited.</strong> Whether checks should become the default later, once B13 and a real compiler show the cost and the ripple. The earlier design made them the default and was reversed before any implementation.</li>
 <li><strong>Interaction with the lazy shape.</strong> A check is a park point inside a loop, so the loop's live values must be spillable; a loop with borrowed locals falls under <a href="#d2-borrowed-locals-and-the-lazy-shape">D2</a> too.</li>
+</ul>
+<h2 id="d14-packages-and-imports">D14. Packages and imports<a class="headerlink" href="#d14-packages-and-imports" title="Permanent link">&para;</a></h2>
+<p><em>Direction for the samples; the details are open.</em> The sample <code>.stra</code> files now all start with <code>package name</code>.</p>
+<ul>
+<li><strong>Rule used in the samples.</strong> A package is the set of files that declare the same name. It compiles to one <code>.smod</code>. Declarations are visible across the package's files with no import. <code>import other</code> names another package, so <code>import redis.types</code> inside <code>redis</code> is gone and <code>import runtime.leaves</code> became <code>import runtime</code>. The package default for <code>[yield]</code>, <code>[noyield]</code> and <code>[nopark]</code> is written on the package declaration in one file, by convention <code>package.stra</code>.</li>
+<li><strong>Directory or declared name.</strong> Alternatives: the directory is the package (simple, no repeated name), or the name is declared in each file (allows the three syntax variants of <code>http/server.stra</code> to be alternatives within <code>http</code>, and allows moving files freely). The samples use the declared name and keep the directory layout as a convention. Recommendation: declared, with a lint when the name and directory disagree.</li>
+<li><strong>Import granularity.</strong> Whole package (used here), or named symbols (<code>import runtime.Conn</code>). Whole package is simpler; symbol imports give the contract hashes in <code>.smod</code> a natural unit, and they are already per symbol there. Recommendation: whole package at the source level.</li>
+<li><strong>Visibility.</strong> What a package exports to others, and how encapsulated <code>sync</code> code (spec 7.2) is protected from being bypassed. Not specified yet.</li>
+<li><strong>Nesting and names.</strong> Whether <code>runtime.io</code> is a package nested in <code>runtime</code> or just a name. The samples treat names as flat.</li>
+<li><strong>Versions.</strong> The <code>.smod</code> carries the package version (<a href="../modules/">modules</a>); how a source tree states which version of an imported package it expects.</li>
 </ul>
 
 
