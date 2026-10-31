@@ -21,6 +21,6 @@ Rules the design has settled on, with the reason each was chosen.
 | No third-party crates in converted programs | Strata would have no equivalents. |
 | Performance goal: same class as Rust async and Java vthreads, with a simpler model | Superiority is not claimed; ceremony is measured alongside speed. |
 | Programming model (vthreads) is separate from implementation (resumable frames) | No feature may depend on the implementation; stackful runtime kept as reference. |
-| Compiler inserts budget checks in loops and recursion unless the function is tagged `never` | Long CPU work cannot monopolise a worker or defy cancellation; `never` gives plain C where the author wants it. Overhead still to be measured. |
+| Compiler inserts budget checks in loops and recursion unless the function is tagged `nopark` | Long CPU work cannot monopolise a worker or defy cancellation; `nopark` gives plain C where the author wants it. Overhead still to be measured. |
 | C stays the backend | Under the module architecture too. |
 | Strata source and C live in separate folders | `stra/` is Strata only; `c/` is runtime and compiler-output stand-ins. |

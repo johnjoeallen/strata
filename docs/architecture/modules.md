@@ -180,7 +180,7 @@ Recompile module M when any of these changes:
 
 Not a reason to recompile M: a change in an imported function's body that leaves its contract hash alone (in incremental mode); a change in an unreferenced export.
 
-**Ripple of effect changes (the main risk).** If `net.Conn.send` becomes `May` where it was `Never`, every caller's contract and generated code change, and so does every caller's callers when their own summary widens. The ripple is bounded by the call graph, and stops wherever a `never` tag or an already-`May` function absorbs it. The module compile prints the contract diff so the cause is visible; this is the same visibility the ownership metadata already needs.
+**Ripple of effect changes (the main risk).** If `net.Conn.send` becomes `May` where it was `Never`, every caller's contract and generated code change, and so does every caller's callers when their own summary widens. The ripple is bounded by the call graph, and stops wherever a `nopark` tag or an already-`May` function absorbs it. The module compile prints the contract diff so the cause is visible; this is the same visibility the ownership metadata already needs.
 
 ## 7. Cross-module propagation, example
 

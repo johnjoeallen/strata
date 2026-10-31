@@ -12,7 +12,7 @@
 | Evaluation | Spec Phase 6: "against Tokio or Java vthreads" | A workload set, ground rules, ceremony metrics, build metrics |
 | Open questions | 10.8 stacks, 10.10 API stability | Superseded and refined into [D1 to D13](open-decisions.md) |
 
-The syntax of existing Strata is unchanged. Proposed additions, each marked placeholder and Open: the `never` tag (opt-out from compiler-inserted budget checks), and `extern blocking`.
+The syntax of existing Strata is unchanged. Proposed additions, each marked placeholder and Open: the `nopark` tag (opt-out from compiler-inserted budget checks), and `extern blocking`.
 
 ## Contradictions found, and how each is resolved
 
@@ -21,7 +21,7 @@ The syntax of existing Strata is unchanged. Proposed additions, each marked plac
 3. **"Lifetime contracts are compile-time only" vs executables needing effect info.** Spec 5.1 says metadata is a compile-time dependency and the executable need not contain it. Still true for Tier A; but park-point tables (debug) and Level-0 entry names are in the executable if tooling is wanted. **Resolved:** debug sections are optional and separable.
 4. **Borrow across a park vs the lazy frame strategy.** The `lazy` measurements assumed no borrowed locals. **Flagged:** [D2](open-decisions.md#d2-borrowed-locals-and-the-lazy-shape).
 5. **"No hidden behaviour" vs inferred effects ripple.** An implementation change can now change a contract. **Flagged, partly resolved:** the exception in principle 10 is extended to effect contracts, mitigated by contract diffs, optional assertions and a version policy ([D4](open-decisions.md#d4-representing-effects-in-public-interfaces)).
-6. **Cooperative cancellation and scheduling vs tasks that never park.** Previously a limitation. **Resolved by decision:** the compiler inserts budget checks in loops and recursion unless tagged `never`, making them yield and cancellation points. Remaining gaps and the overhead question are in [D13](open-decisions.md#d13-runaway-non-parking-code).
+6. **Cooperative cancellation and scheduling vs tasks that never park.** Previously a limitation. **Resolved by decision:** the compiler inserts budget checks in loops and recursion unless tagged `nopark`, making them yield and cancellation points. Remaining gaps and the overhead question are in [D13](open-decisions.md#d13-runaway-non-parking-code).
 7. **Foreign callbacks vs vthreads.** A callback cannot be suspended. **Resolved** by the `Never` default and the synchronous driver on pool threads.
 
 ## Outstanding decisions
