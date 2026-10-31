@@ -110,9 +110,11 @@ A lint, not a proof. Termination is undecidable, so these are warnings and never
 | `loops` | Meaning |
 |---|---|
 | `none` | No loop or recursion |
-| `bounded` | Every loop has a constant bound under a threshold, or a bound taken from a stated limit (principle 11) |
-| `long` | A constant bound above the threshold, nested loops whose product exceeds it, or a bound set by input of unstated size |
-| `unbounded` | `loop {}`, or `while` where nothing moves the condition toward exit, or unbounded recursion |
+| `bounded` | Every loop advances a counter or iterator toward a constant bound under the threshold |
+| `long` | A constant bound above the threshold; a bound that is loop-invariant but not constant (a configured limit such as `lim.maxBulk`); iteration over a collection of unstated size; or nested loops whose product exceeds the threshold |
+| `unbounded` | No proven progress toward an exit: `loop {}`, a `while` where nothing moves the condition, or unbounded recursion |
+
+A loop that advances a counter toward a loop-invariant bound terminates even when the bound is only known at run time, so the compiler can see it without any annotation. A stated limit that the program enforces with an ordinary `if`/`throw` (principle 11) is visible the same way.
 
 Calls through interfaces, function values and foreign code contribute nothing at normal levels (a lint is not a proof) and are listed as `unknown` at the strictest level.
 
@@ -124,7 +126,7 @@ Calls through interfaces, function values and foreign code contribute nothing at
 
 **When it runs.** Off by default in ordinary builds, except for one case: **`unbounded` inside a `sync`/`mutate` body always warns**, because spec 7.1 relies on hold time being bounded by the block, and nothing else enforces it. A flag selects levels (placeholder `--warn-loops=off|marked|reachable|all`): `marked` covers `[noyield]` and `[nopark]` functions; `reachable` adds unmarked functions reachable from `spawn` roots; `all` adds everything. Editor and CI use it freely.
 
-**Suppression.** An allow-attribute on the function or loop (placeholder). **Open:** a stated bound on the loop itself (`while cond [max 1000]`), enforced in debug builds, which would also make the class `bounded`.
+**Suppression.** An allow-attribute on the function or loop (placeholder). It acknowledges the warning and makes no claim about the loop. A loop-level bound annotation was considered and dropped: if the compiler can see a counter or constant it is redundant, if not it is an unchecked claim, yielding at the bound is just `[yield]`, and silently stopping at the bound hides behaviour. The only coherent form is an ordinary `if`/`throw` on a limit, which the program can already write.
 
 **What the module exposes.** The `loops` class is part of each exported function's summary, in a separate *advisory* section that is **not** part of the contract hash, so a change in loop structure never forces dependants to recompile. A caller's lint reads the callee's current `.smod`, and the warning can lag until relink ([modules](modules.md#effect-summaries)).
 

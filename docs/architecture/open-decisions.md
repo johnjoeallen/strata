@@ -78,7 +78,6 @@ Still open:
 
 - **Overhead of a check** in a `[yield]` loop. Unmeasured; strip-mining and small-bound elision are expected to keep it low. Benchmark B13.
 - **Budget unit.** An iteration counter (cheap, not time) against a timestamp or a flag set from another thread. Recommendation: counter, sized in iterations per check block; the watchdog flag later.
-- **Stated loop bounds.** `while cond [max N]`, enforced in debug builds, would let the author declare a bound instead of suppressing a warning.
 - **Lambdas** inheriting the enclosing function's setting.
 - **Default revisited.** Whether checks should become the default later, once B13 and a real compiler show the cost and the ripple. The earlier design made them the default and was reversed before any implementation.
 - **Interaction with the lazy shape.** A check is a park point inside a loop, so the loop's live values must be spillable; a loop with borrowed locals falls under [D2](#d2-borrowed-locals-and-the-lazy-shape) too.
