@@ -1029,7 +1029,7 @@
 <td>No feature may depend on the implementation; stackful runtime kept as reference.</td>
 </tr>
 <tr>
-<td>Compiler inserts budget checks only in functions marked <code>[yield]</code> (or in a type or package marked so, innermost wins); <code>[noyield]</code> overrides; <code>[nopark]</code> asserts no parking at all</td>
+<td>Compiler inserts slice checks only in functions marked <code>[yield]</code> (or in a type or package marked so, innermost wins); <code>[noyield]</code> overrides; <code>[nopark]</code> asserts no parking at all</td>
 <td>Principle 10: nothing is inserted unless the code says so. Loops add no effect by default, so looping helpers are usable under locks without tagging. The cost is that unmarked CPU-bound code can stall a worker, which warnings aim to find.</td>
 </tr>
 <tr>
