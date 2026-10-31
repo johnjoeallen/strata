@@ -10,6 +10,7 @@
 | Compiler architecture | Not described (Phase 0 and 5 only) | The pipeline in [index](index.md); C stays the backend |
 | Interfaces, function values, FFI | Spec 5.2, 9, 10.9 mention them | Bound-based dispatch, `extern blocking`, callbacks, dynamic loading rules |
 | Evaluation | Spec Phase 6: "against Tokio or Java vthreads" | A workload set, ground rules, ceremony metrics, build metrics |
+| Sharing | Undecided: `shared var`, shareable `Ref<T>`, or a type-level declaration | One `Ref<T>`; sharing inferred; blocks required by path analysis ([sharing](../sharing.md)) |
 | Open questions | 10.8 stacks, 10.10 API stability | Superseded and refined into [D1 to D13](open-decisions.md) |
 
 The syntax of existing Strata is unchanged. Proposed additions, each marked placeholder and Open: the `nopark` tag (opt-out from compiler-inserted budget checks), and `extern blocking`.

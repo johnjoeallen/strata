@@ -2,8 +2,8 @@
 
 ## Design
 
-- Are all `Ref<T>` counts atomic by default, or can compiler-proven confinement use plain counts, and how is migration to shared ownership kept safe?
-- Is `sync`/`mutate` required for every `Ref<T>`, or only for those that may cross tasks, and how is shareability declared?
+- Per-instance sharing: does the flag test on each reference-count operation cost more than always-atomic for non-local references? See [sharing](sharing.md).
+- Sharing (direction chosen, see [sharing](sharing.md)): the cost of the per-instance shared flag, publishing a graph, where the lock word lives, write-once fields across modules, access modes on interfaces.
 - When does a growable array get a dedicated virtual region instead of a relocatable buffer?
 - Exact string representation, slicing and UTF-8 indexing.
 - How does a throw interact with a scope that still has child vthreads?

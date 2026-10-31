@@ -66,6 +66,19 @@ invariants: cleanup methods are Never; foreign=blocking implies park=May
 
 Summaries are **inferred**, then **exported as part of the contract**. The consequence, already noted for borrow origins in spec 5.1: changing an implementation can change the contract with no source signature change. The compiler reports it ([versioning](#4-versioning-and-compatibility)).
 
+### Access and escape summaries
+
+Also part of each exported function's contract, and of each exported type (see [sharing](../sharing.md)):
+
+```
+per borrowed or Ref parameter:  access = none | read | write      (through the receiver and by-value fields)
+                                escape = none | retained | published (stored beyond the call / given to spawn or a message)
+result:                         fresh  = yes | no                 (a new allocation nothing else refers to)
+per type field:                 mutability = write-once | mutable
+```
+
+These are what the compiler needs to report a missing or too-weak `sync`/`mutate` across modules without the callee's source. Changing a field from write-once to mutable, a parameter's access from read to write, or a result from fresh to not fresh is a breaking change.
+
 ### Call-graph information
 
 Retained in Tier C, and also, in reduced form, in the contract:

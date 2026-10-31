@@ -37,6 +37,7 @@ nav:
       - 4. Against Rust and Go: journey/04-comparison.md
       - 5. mini-redis: journey/05-mini-redis.md
       - 6. Locks that park: journey/06-locks.md
+  - Sharing and access checking: sharing.md
   - Architecture:
       - architecture/index.md
       - Suspension and continuations: architecture/suspension.md
