@@ -1,0 +1,1884 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Designing a Rust alternative with Goose-style arenas, one measured step at a time">
+      
+      
+      
+        <link rel="canonical" href="https://johnjoeallen.github.io/strata/dev/architecture/suspension/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../modules/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Suspension and continuations - Strata</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#suspension-and-continuations" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Strata" class="md-header__button md-logo" aria-label="Strata" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Strata
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Suspension and continuations
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/johnjoeallen/strata" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    johnjoeallen/strata
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Strata" class="md-nav__button md-logo" aria-label="Strata" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Strata
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/johnjoeallen/strata" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    johnjoeallen/strata
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The journey
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    The journey
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../journey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The journey
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../journey/01-why/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Why Strata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../journey/02-foundations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. Measuring the foundations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../journey/03-http/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. An HTTP server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../journey/04-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Against Rust and Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../journey/05-mini-redis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. mini-redis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../journey/06-locks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Locks that park
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture: compilation, suspension and modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Suspension and continuations
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Suspension and continuations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-may-park-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The may-park effect
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. The may-park effect">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sources-of-parking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources of parking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Propagation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#programmer-facing-consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programmer-facing consequences
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-lowering-to-resumable-frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Lowering to resumable frames
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Lowering to resumable frames">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-three-shapes-of-a-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three shapes of a function
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-suspendable-form-native-stack-fast-path-frames-made-on-demand-direction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The suspendable form: native-stack fast path, frames made on demand (Direction)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frame-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frame layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pseudocode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pseudocode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#borrows-and-locals-that-cannot-be-moved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Borrows and locals that cannot be moved
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-calls-that-never-suspend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Calls that never suspend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-errors-cancellation-and-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Errors, cancellation and cleanup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Errors, cancellation and cleanup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#errors-throws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors (throws)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cancellation-direction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancellation (Direction)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deterministic-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-recursion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Recursion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-interaction-with-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Interaction with ownership
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-optimisation-opportunities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Optimisation opportunities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-relative-to-java-virtual-threads-and-rust-async" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Relative to Java virtual threads and Rust async
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-where-stackful-execution-remains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Where stackful execution remains
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compiled modules and linking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dispatch-and-ffi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispatch and external code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../open-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes and contradictions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../repo-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Repository map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-may-park-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The may-park effect
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. The may-park effect">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sources-of-parking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources of parking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Propagation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#programmer-facing-consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programmer-facing consequences
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-lowering-to-resumable-frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Lowering to resumable frames
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Lowering to resumable frames">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-three-shapes-of-a-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three shapes of a function
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-suspendable-form-native-stack-fast-path-frames-made-on-demand-direction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The suspendable form: native-stack fast path, frames made on demand (Direction)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frame-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frame layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pseudocode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pseudocode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#borrows-and-locals-that-cannot-be-moved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Borrows and locals that cannot be moved
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-calls-that-never-suspend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Calls that never suspend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-errors-cancellation-and-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Errors, cancellation and cleanup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Errors, cancellation and cleanup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#errors-throws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors (throws)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cancellation-direction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancellation (Direction)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deterministic-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-recursion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Recursion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-interaction-with-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Interaction with ownership
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-optimisation-opportunities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Optimisation opportunities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-relative-to-java-virtual-threads-and-rust-async" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Relative to Java virtual threads and Rust async
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-where-stackful-execution-remains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Where stackful execution remains
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="suspension-and-continuations">Suspension and continuations<a class="headerlink" href="#suspension-and-continuations" title="Permanent link">&para;</a></h1>
+<h2 id="1-the-may-park-effect">1. The may-park effect<a class="headerlink" href="#1-the-may-park-effect" title="Permanent link">&para;</a></h2>
+<p>Every function has an inferred <strong>effect summary</strong>. The part that matters for suspension is the park effect:</p>
+<div class="highlight"><pre><span></span><code>Park(f) = Never          f cannot park, on any path
+        | May            f may park
+        | Cond(P)        f parks only if an argument bound to a member of P may park
+                         (P = function-typed parameters, interface-typed parameters, type parameters)
+</code></pre></div>
+<p>with the order <code>Never &lt; Cond(P) &lt; May</code>. The complete summary, which also records <code>throws</code> and foreign blocking, is in <a href="../modules/#effect-summaries">modules</a>.</p>
+<h3 id="sources-of-parking">Sources of parking<a class="headerlink" href="#sources-of-parking" title="Permanent link">&para;</a></h3>
+<p>A function's own body can park only through these, and the analysis starts from them:</p>
+<ol>
+<li>A call to an <code>extern parks fn</code> (<code>sleep</code>, <code>yield</code>, <code>waitAny</code>, <code>Conn.recv</code>, <code>Conn.send</code>, ...). Already in <code>stra/runtime/leaves.stra</code>.</li>
+<li>Entering <code>sync</code>/<code>mutate</code> (it queues FIFO, see spec 7.1). The body of the block can never park, so a lock is never held across a suspension.</li>
+<li>A call to a function whose summary is <code>May</code>, or <code>Cond(P)</code> with a member of <code>P</code> bound to something that may park.</li>
+<li>A call through an interface or function value whose declared bound permits parking (see <a href="../dispatch-and-ffi/#interface-calls">dispatch</a>).</li>
+<li>A compiler-inserted scheduling check, if the build enables budgeted preemption (see the discussion in <code>ASSESSMENT.md</code>). This makes more functions <code>May</code>, so it is a build setting, not a default.</li>
+<li>A call to a blocking foreign function that the runtime offloads (see <a href="../dispatch-and-ffi/#blocking-foreign-calls">blocking FFI</a>).</li>
+</ol>
+<p>Cleanup methods are <code>Never</code> by rule (spec section 9). A cleanup that tries to call a <code>May</code> function is a compile error, which is already the behaviour for <code>sync</code>/<code>mutate</code> bodies.</p>
+<h3 id="propagation">Propagation<a class="headerlink" href="#propagation" title="Permanent link">&para;</a></h3>
+<p>The effect propagates transitively over the call graph. Within a module it is computed as a fixed point over strongly connected components of the call graph:</p>
+<div class="highlight"><pre><span></span><code>for each SCC in reverse topological order:
+    repeat until no change:
+        for f in SCC:
+            f.park = join(own park sources of f,
+                          Park(g) for each direct callee g,    // imported g: read from its summary
+                          bound(i) for each indirect call i)   // see dispatch
+</code></pre></div>
+<p>Mutually recursive functions share one SCC and end up with the same effect. A recursive function with no park source anywhere in its SCC stays <code>Never</code>.</p>
+<p>Across modules the same computation runs on summaries (a few words per function) and never needs the callee's code. That is what lets an application be checked without anyone's source.</p>
+<h3 id="programmer-facing-consequences">Programmer-facing consequences<a class="headerlink" href="#programmer-facing-consequences" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>No colouring in source.</strong> Nothing is written to opt in or out of parking. This is the one exception to principle 10 ("no hidden behaviour"), and it is unchanged.</li>
+<li><strong>Visibility is tooling's job</strong> (Decided, principle 10): hover, lints and errors that name the chain <code>handle -&gt; loadUser -&gt; pool.acquire -&gt; Conn.recv</code>.</li>
+<li><strong>An optional assertion</strong> (<strong>Open</strong>, see <a href="../open-decisions/#d4-representing-effects-in-public-interfaces">open decisions D4</a>). A public function can be asserted <code>noparks</code>; the compiler then rejects any change that makes it park. This is not a colour (it is never required, and callers need not mention it); it only turns a silent effect change into a compile error at the library boundary. Syntax is a placeholder.</li>
+</ul>
+<h2 id="2-lowering-to-resumable-frames">2. Lowering to resumable frames<a class="headerlink" href="#2-lowering-to-resumable-frames" title="Permanent link">&para;</a></h2>
+<h3 id="the-three-shapes-of-a-function">The three shapes of a function<a class="headerlink" href="#the-three-shapes-of-a-function" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Park(f)</th>
+<th>Generated form</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Never</code></td>
+<td>An ordinary C function. No frame, no status codes beyond <code>throws</code>.</td>
+</tr>
+<tr>
+<td><code>Cond(P)</code></td>
+<td>Compiled as two entries. A call whose <code>P</code> arguments are <code>Never</code> binds to the plain form; otherwise to the suspendable form.</td>
+</tr>
+<tr>
+<td><code>May</code></td>
+<td>The suspendable form below.</td>
+</tr>
+</tbody>
+</table>
+<p>The key property for performance, and the reason conservatism is affordable: <strong>a <code>May</code> function that does not park on a given call costs about the same as an ordinary call</strong>. This was measured on the hand-written C (<code>bench/results/lazy.md</code>): about 0.7 to 1.5 ns per extra parking call in a chain, against ordinary calls, and 3.4 ns for the whole four-deep request. It is a microbenchmark with hot frames, so it supports "conservative contracts are cheap enough to be the default" and not much more.</p>
+<h3 id="the-suspendable-form-native-stack-fast-path-frames-made-on-demand-direction">The suspendable form: native-stack fast path, frames made on demand (Direction)<a class="headerlink" href="#the-suspendable-form-native-stack-fast-path-frames-made-on-demand-direction" title="Permanent link">&para;</a></h3>
+<p>Each <code>May</code> function is compiled to a pair:</p>
+<div class="highlight"><pre><span></span><code>f_call(task, args..., out*) -&gt; status       runs on the worker's native stack
+f_resume(task, frame*)      -&gt; status       state-machine entry used after a park
+
+status = DONE | THROWN | PARKED
+</code></pre></div>
+<p><code>f_call</code> is the function as written, as straight C. Calls to other <code>May</code> functions check the returned status. If the callee returns <code>PARKED</code>, <code>f_call</code> does <strong>not</strong> park by itself. It allocates a frame, copies out the locals that are live across that call, records its state number, links the frame to the callee's frame, and returns <code>PARKED</code> to its own caller. The next function up does the same. A chain of N frames is therefore built from the leaf upward, during one return, and only when the park really happens.</p>
+<p>When the event arrives, the scheduler calls the <em>innermost</em> frame's <code>f_resume</code>. When that finishes, it resumes its parent frame directly, in turn. This is the <code>lazy</code> strategy plus <code>direct</code> resume from the experiments. Two measured reasons it is the first choice:</p>
+<ul>
+<li>Parks are rare relative to calls in typical handlers, so the common path allocates nothing (<code>lazy.md</code>: allocations per request = p x (D+1)).</li>
+<li>Resuming only the innermost frame, rather than re-entering every frame from the root as Rust async does, kept wake cost flat with depth: 6.3 ns against 26.2 ns at depth 16 (<code>bench/results/frames.txt</code>).</li>
+</ul>
+<p>The alternatives stay on the table because <code>lazy</code> needs two code versions per function that must agree on state numbering, and was 1.2x the code size of <code>eager</code> in the toy:</p>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>Allocations when no park</th>
+<th>Code</th>
+<th>When it wins</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Eager: a frame per <code>May</code> call</td>
+<td>D+1</td>
+<td>smallest</td>
+<td>Frame-resident locals (below); debug builds</td>
+</tr>
+<tr>
+<td>Embedded: callee frames inside caller's frame</td>
+<td>0 or 1 per task</td>
+<td>medium</td>
+<td>Chains that nearly always park (p near 1)</td>
+</tr>
+<tr>
+<td>Lazy: frames made while unwinding</td>
+<td>p x (D+1)</td>
+<td>largest</td>
+<td>Rare parks; <strong>default</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The compiler may choose per function (<strong>Direction</strong>). The choice is invisible to callers because they only see <code>status</code>; that is what makes it a module-level decision and not an ABI one.</p>
+<h3 id="frame-layout">Frame layout<a class="headerlink" href="#frame-layout" title="Permanent link">&para;</a></h3>
+<p>A frame is:</p>
+<div class="highlight"><pre><span></span><code>+------------------------------+
+| resume function pointer      |   header, identical for every function
+| state number                 |   (the stable part of the ABI)
+| parent frame link            |
+| task pointer                 |
+| result/out slot binding      |
++------------------------------+
+| live slots                   |   private to the function
++------------------------------+
+</code></pre></div>
+<p>Live slots are the values live at <em>some</em> suspension point. Slots that are never live at the same time share storage, by the usual register-colouring over park points. Temporaries live across a park (an argument already evaluated for a call that has not happened, a pending <code>Ref</code> promotion) are slots like any others.</p>
+<p>Frames come from a per-function arena, sized exactly. This matches the existing per-type arena rule and the <code>frames_bench</code> model; idle parked task cost there was 137 B with no state and 393 B at depth 4, against a 4 KB floor for a stackful fiber (Measured, hand-written).</p>
+<p><strong>Frames never move</strong> (Direction). A frame address is stable from creation to destruction. This removes the <code>Pin</code> problem Rust async has, and lets other code hold pointers into a frame.</p>
+<h3 id="pseudocode">Pseudocode<a class="headerlink" href="#pseudocode" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>// module db (compiled separately)         Park(query) = May   (calls Conn.recv)
+fn query(sql: string&amp;, id: i64) -&gt; Row throws DbError {
+    let c = pool.acquire();                 // May: waits for a free connection
+    c.send(encode(sql, id));                // May
+    return decode(c.recv());                // May
+}
+
+// module app
+fn handle(req: Request&amp;) -&gt; Response throws DbError {
+    let row = db.query("select ...", req.id);   // inferred May; nothing written
+    return render(row);                         // Never
+}
+</code></pre></div>
+<p>Generated C for <code>handle</code> (illustrative; names and layout are not fixed):</p>
+<div class="highlight"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">frame_hdr</span><span class="w"> </span><span class="n">h</span><span class="p">;</span><span class="w"> </span><span class="n">Request</span><span class="w"> </span><span class="o">*</span><span class="n">req</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="n">handle_frame</span><span class="p">;</span><span class="w">   </span><span class="c1">// row is not live across a park, so not a slot</span>
+
+<span class="n">st_t</span><span class="w"> </span><span class="nf">app_handle_call</span><span class="p">(</span><span class="n">task_t</span><span class="w"> </span><span class="o">*</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">Request</span><span class="w"> </span><span class="o">*</span><span class="n">req</span><span class="p">,</span><span class="w"> </span><span class="n">Response</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="p">;</span>
+<span class="w">    </span><span class="n">st_t</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">db_query_call</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="s">"select ..."</span><span class="p">,</span><span class="w"> </span><span class="n">req</span><span class="o">-&gt;</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">row</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">s</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">PARKED</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">                              </span><span class="c1">// a real park, happening now</span>
+<span class="w">        </span><span class="n">handle_frame</span><span class="w"> </span><span class="o">*</span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">frame_new</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">app_handle_resume</span><span class="p">,</span><span class="w"> </span><span class="cm">/*state*/</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">        </span><span class="n">f</span><span class="o">-&gt;</span><span class="n">req</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">req</span><span class="p">;</span>
+<span class="w">        </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">innermost</span><span class="o">-&gt;</span><span class="n">parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">f</span><span class="p">;</span><span class="w">                   </span><span class="c1">// link callee's frame to ours</span>
+<span class="w">        </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">innermost</span><span class="o">-&gt;</span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">f</span><span class="o">-&gt;</span><span class="n">h</span><span class="p">.</span><span class="n">result</span><span class="p">;</span><span class="w">           </span><span class="c1">// the result now lands in the frame, not on our stack</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">PARKED</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">s</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">THROWN</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">THROWN</span><span class="p">;</span><span class="w">                 </span><span class="c1">// no cleanups pending in this function</span>
+<span class="w">    </span><span class="o">*</span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">render</span><span class="p">(</span><span class="o">&amp;</span><span class="n">row</span><span class="p">);</span><span class="w">                            </span><span class="c1">// Never: a plain call</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">DONE</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">st_t</span><span class="w"> </span><span class="nf">app_handle_resume</span><span class="p">(</span><span class="n">task_t</span><span class="w"> </span><span class="o">*</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">handle_frame</span><span class="w"> </span><span class="o">*</span><span class="n">f</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">f</span><span class="o">-&gt;</span><span class="n">h</span><span class="p">.</span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="mi">1</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">                                       </span><span class="c1">// db.query finished</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">-&gt;</span><span class="n">wake</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">THROWN</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">frame_free</span><span class="p">(</span><span class="n">f</span><span class="p">);</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">THROWN</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="n">Response</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">render</span><span class="p">((</span><span class="n">Row</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">f</span><span class="o">-&gt;</span><span class="n">h</span><span class="p">.</span><span class="n">result</span><span class="p">);</span>
+<span class="w">        </span><span class="n">frame_free</span><span class="p">(</span><span class="n">f</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">finish</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">r</span><span class="p">);</span><span class="w">                       </span><span class="c1">// resume parent directly or complete the task</span>
+<span class="w">    </span><span class="p">}}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>One real hazard shows in <code>t-&gt;innermost-&gt;out = ...</code>: the callee was given a pointer into the caller's native stack. Pointers to locals that are live across a park are the subject of the next subsection.</p>
+<h3 id="borrows-and-locals-that-cannot-be-moved">Borrows and locals that cannot be moved<a class="headerlink" href="#borrows-and-locals-that-cannot-be-moved" title="Permanent link">&para;</a></h3>
+<p>The lazy form copies locals into a frame only when a park occurs. A copy changes the address. Two things can hold the old address:</p>
+<ol>
+<li>A <strong>borrow</strong> (<code>T&amp;</code>) to a local, given to a callee that is part of the park chain, or kept in another local.</li>
+<li>A <strong>result or out pointer</strong> (above), which the unwinding step can rebind because it is compiler-generated.</li>
+</ol>
+<p>Case 2 is mechanical. Case 1 is not: <code>let buf = readBuffer(); conn.recv(buf&amp;)</code> is exactly this shape, and extremely common.</p>
+<p><strong>Direction:</strong> a local that is borrowed <em>and</em> live across a call that may park is <strong>frame-resident</strong> from its declaration, in a frame created at function entry. A function with any frame-resident local uses the eager shape for that function. Other functions in the chain stay lazy. The borrow-origin analysis (spec section 5) already has what is needed to decide this; the new fact is only that the flag <em>borrowed across a may-park call</em> is recorded for each local. This is a real constraint on how often <code>lazy</code> applies, and not measured: the toy benchmark has no borrowed locals. See <a href="../open-decisions/#d2-borrowed-locals-and-the-lazy-shape">open decision D2</a>.</p>
+<h2 id="3-calls-that-never-suspend">3. Calls that never suspend<a class="headerlink" href="#3-calls-that-never-suspend" title="Permanent link">&para;</a></h2>
+<p>The common request has many <code>Never</code> helpers (parsing, rendering, hashing). They compile to ordinary C, and are inlined by the C compiler under its usual rules. A <code>Cond(P)</code> function called with a known non-parking argument binds to its plain entry. A <code>May</code> function called only from other functions that statically cannot reach its park sources cannot exist, since then it would have been <code>Never</code>.</p>
+<p>For a <code>May</code> function the non-suspending path should be straight-line C with one status test after each <code>May</code> call. The cost of that test is what the 0.7 to 1.5 ns above measures.</p>
+<h2 id="4-errors-cancellation-and-cleanup">4. Errors, cancellation and cleanup<a class="headerlink" href="#4-errors-cancellation-and-cleanup" title="Permanent link">&para;</a></h2>
+<h3 id="errors-throws">Errors (<code>throws</code>)<a class="headerlink" href="#errors-throws" title="Permanent link">&para;</a></h3>
+<p>C has no unwinding, so a throw is a status return (<code>THROWN</code>) with the exception in the task, and each function branches to its cleanup block for the scope it is in, then returns <code>THROWN</code>. This is the same machinery as the park return, which is why the two compose. Not built in the C prototypes yet (listed in <code>open-questions.md</code>).</p>
+<p>Across a park, a thrown exception arriving at <code>f_resume</code> (<code>t-&gt;wake == THROWN</code>) enters the same cleanup blocks as it would on the fast path. The cleanup code is shared between <code>f_call</code> and <code>f_resume</code>; this is a code generation requirement, not a runtime one.</p>
+<h3 id="cancellation-direction">Cancellation (Direction)<a class="headerlink" href="#cancellation-direction" title="Permanent link">&para;</a></h3>
+<p>Cooperative, as in spec 6.2: the cancelling party marks the task and wakes it. A task is only ever cancelled <strong>at a park point</strong>, because that is where its state is in a frame. The wake carries <code>wake = CANCELLED</code>, and <code>f_resume</code> takes the unwinding path: run cleanups of the scopes it is in, free its own frame, resume the parent with <code>CANCELLED</code>, and so on up the chain. Frames are never discarded without running cleanups, and cleanups never park, so unwinding is bounded.</p>
+<p>Cancellation is <strong>not an ordinary exception</strong>: it is not named in <code>throws</code>, and <code>catch</code> cannot swallow it. Letting <code>catch (Exception)</code> swallow it would make cancellation unreliable; requiring it in <code>throws</code> would put the effect back in signatures everywhere. This choice interacts with the open exception-model question (spec 10.7) and is stated here as Direction only.</p>
+<p>A task that never parks cannot be cancelled. That is the same limitation as today's cooperative scheduler and is the reason to keep the budgeted-check option open.</p>
+<h3 id="deterministic-cleanup">Deterministic cleanup<a class="headerlink" href="#deterministic-cleanup" title="Permanent link">&para;</a></h3>
+<p>Cleanup of a resource runs when its scope exits, by normal return, <code>THROWN</code> or <code>CANCELLED</code>, and happens before the frame is freed. Task-level cleanup precedes reclamation of any task arena (spec section 9, unchanged). A parked task holding a <code>sync</code> permission is impossible by construction (no park inside the block), so no frame ever owns a lock.</p>
+<h2 id="5-recursion">5. Recursion<a class="headerlink" href="#5-recursion" title="Permanent link">&para;</a></h2>
+<ul>
+<li>A recursive function with park sources in its SCC is <code>May</code>. Each activation has its own frame, taken from an arena, so recursion depth while parked is limited by memory, not by a stack size.</li>
+<li>On the <strong>fast path</strong> a recursive <code>May</code> function consumes native stack until it returns or parks. A runaway recursion that never parks would overflow the worker's stack, as in any C program. <strong>Direction:</strong> a depth counter in recursive <code>May</code> functions; past a limit they switch to the eager shape (frames, not native stack), so depth is bounded by the declared limits (principle 11) rather than by the worker stack. <strong>Open:</strong> the limit, and whether recursive <code>Never</code> functions also need a declared depth bound.</li>
+<li>Mutual recursion across modules is not possible through ordinary imports (module imports form a DAG). It can occur through interface calls, where the effect is the declared bound (see dispatch).</li>
+</ul>
+<h2 id="6-interaction-with-ownership">6. Interaction with ownership<a class="headerlink" href="#6-interaction-with-ownership" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Rule (Direction unless stated)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Ref&lt;T&gt;</code> live across a park</td>
+<td>Held in a frame slot; the slot is an owner. Frame destruction (normal, thrown or cancelled) releases it. A parked task therefore keeps its objects alive.</td>
+</tr>
+<tr>
+<td><code>WeakRef&lt;T&gt;</code> live across a park</td>
+<td>Held in a slot. Promotion is a separate step after the resume, as everywhere (spec 3.1). The compiler must not hoist a promotion across a park point: the object may have expired meanwhile.</td>
+</tr>
+<tr>
+<td>Borrow <code>T&amp;</code> live across a park</td>
+<td>Allowed if the referent outlives the parked task. The lifetime analysis (spec section 5) already tracks origins; the new check is that <strong>every referent a borrow can point to is either frame-resident, a <code>Ref</code> held by the frame, or static</strong>. A borrow of a native-stack local is the case handled above.</td>
+</tr>
+<tr>
+<td>Task temporary arena</td>
+<td>Belongs to the vthread, not to a frame. Survives parks. Reclaimed at task exit after cleanups.</td>
+</tr>
+<tr>
+<td>Per-function frame arenas</td>
+<td>Runtime-owned like per-type arenas. A frame can be freed on a different worker from the one that allocated it (a task can resume anywhere once migration exists), so frees must be cross-thread-safe; the same requirement as <code>new</code>.</td>
+</tr>
+<tr>
+<td>Escape analysis (spec 4.4)</td>
+<td>A value that does not escape the task may live in the task arena or in a frame slot. The compiler must preserve destructor timing across parks.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-optimisation-opportunities">7. Optimisation opportunities<a class="headerlink" href="#7-optimisation-opportunities" title="Permanent link">&para;</a></h2>
+<p><strong>These are not guaranteed.</strong> Each is something the compiler may do when conditions hold, and none changes behaviour. The tier column says what each needs from <a href="../modules/">the module format</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Opportunity</th>
+<th>What it is</th>
+<th>Conditions</th>
+<th>Needs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Frame embedding</td>
+<td>The callee's slots live inside the caller's frame. One allocation per task instead of D+1.</td>
+<td>Callee frame size known; callee not recursive; one live activation per caller activation.</td>
+<td>Callee layout (link time, or a fixed layout exported from its module)</td>
+</tr>
+<tr>
+<td>Allocation elimination</td>
+<td>No frame for a function that never parks in practice</td>
+<td>Not provable; use <code>lazy</code> instead, which allocates only on a park</td>
+<td>None</td>
+</tr>
+<tr>
+<td>State-machine fusion</td>
+<td>Inline a <code>May</code> callee into its caller so its park points become states of the caller's machine; one frame, one resume function.</td>
+<td>Single call site, or small callee; direct (not virtual) target; not recursive.</td>
+<td>Callee IR (Tier C)</td>
+</tr>
+<tr>
+<td>Flattening</td>
+<td>A chain <code>a -&gt; b -&gt; c</code> becomes one machine</td>
+<td>The same, repeated; code size bounded</td>
+<td>Callee IR</td>
+</tr>
+<tr>
+<td>Slot overlay</td>
+<td>Slots from inlined callees share storage by liveness</td>
+<td>After fusion</td>
+<td>IR</td>
+</tr>
+<tr>
+<td>Direct resume</td>
+<td>Resume the innermost frame only</td>
+<td>Always applied by the <code>lazy</code>/<code>direct</code> scheme</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Park-free specialisation</td>
+<td>A <code>Cond(P)</code> function called with a non-parking argument becomes <code>Never</code></td>
+<td>Argument's effect known statically</td>
+<td>Summary</td>
+</tr>
+</tbody>
+</table>
+<p>Limits on fusion: code size growth; an exported function still needs its own standalone entry points; debugging and profiling need a map from fused states back to logical frames (see <a href="../open-decisions/#d8-debugging-stack-traces-and-profiling">open decisions D8</a>); cancellation points and cleanup scopes of the inlined function must keep their order and timing exactly; recursion and virtual calls block it. The measured upper bound on what any of this can save is small in the toy case: about 1 ns per parking call, "a request that does any real work costs thousands of times more" (<code>lazy.md</code>). Fusion is therefore a later, evidence-driven optimisation, not part of the first compiler.</p>
+<h2 id="8-relative-to-java-virtual-threads-and-rust-async">8. Relative to Java virtual threads and Rust async<a class="headerlink" href="#8-relative-to-java-virtual-threads-and-rust-async" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Java virtual threads</th>
+<th>Rust async</th>
+<th>Strata (Direction)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Source</td>
+<td>Plain blocking style</td>
+<td><code>async fn</code>, <code>.await</code>, runtime choice</td>
+<td>Plain blocking style</td>
+</tr>
+<tr>
+<td>Suspension visible in signatures</td>
+<td>No</td>
+<td>Yes (<code>async</code>)</td>
+<td>No in source; yes in tooling and module summaries</td>
+</tr>
+<tr>
+<td>Implementation</td>
+<td>Stack of a continuation copied to and from the heap by the JVM (stackful)</td>
+<td>One compiler-generated state machine per <code>async</code> body, composed into a larger one</td>
+<td>Per-function resumable frames; compiler-generated</td>
+</tr>
+<tr>
+<td>Memory per parked task</td>
+<td>Depends on the stack depth at park, copied</td>
+<td>Size of the composed state machine, known statically</td>
+<td>Frames per function on the chain; exact, not yet measured in a compiler</td>
+</tr>
+<tr>
+<td>Can suspend through native frames</td>
+<td>Pinned or blocked in some cases (<code>native</code>, and <code>synchronized</code> on older JDKs)</td>
+<td>Not applicable: <code>await</code> only crosses async code</td>
+<td>No: foreign frames cannot be captured, so the rules in <a href="../dispatch-and-ffi/">dispatch</a> apply</td>
+</tr>
+<tr>
+<td>Runtime requirement</td>
+<td>JVM with JIT and GC</td>
+<td>Library executor</td>
+<td>Small C runtime, no GC, no JIT</td>
+</tr>
+<tr>
+<td>Dynamic code and reflection</td>
+<td>Natural</td>
+<td>Limited</td>
+<td>Weaker; closed-world assumptions help the optimiser</td>
+</tr>
+<tr>
+<td>Recursion</td>
+<td>Natural</td>
+<td>Needs boxing</td>
+<td>Natural (frames from arenas)</td>
+</tr>
+<tr>
+<td><code>dyn</code> / virtual</td>
+<td>Natural</td>
+<td>Needs <code>Box&lt;dyn Future&gt;</code> and <code>Pin</code></td>
+<td>Uniform: effect bound in the interface</td>
+</tr>
+<tr>
+<td>Cost of a function that might park but does not</td>
+<td>A call</td>
+<td>A poll, plus the state machine's size</td>
+<td>A call plus a status test (Measured, toy)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Advantages Strata is aiming for:</strong> no function colouring and no <code>Pin</code>; precise frames with no stack copying; deterministic cleanup on cancellation (Rust async cancels by dropping, Java by interrupts); no runtime beyond the C one.</p>
+<p><strong>Trade-offs and limitations, stated plainly:</strong></p>
+<ul>
+<li>Every function the analysis marks <code>May</code> costs a status test per <code>May</code> call and extra generated code. The analysis can mark a function <code>May</code> because of a deep, unseen callee; nothing in the source says so.</li>
+<li>Compile-time complexity moves from the programmer to the compiler: effect inference, frame layout, two code versions per function, and a module format that must carry it all.</li>
+<li>Foreign code cannot be suspended in the middle. Java's pinning problem exists here in a different form (see <a href="../dispatch-and-ffi/#blocking-foreign-calls">dispatch</a>).</li>
+<li>Stack traces and profilers see the native stack, not the logical one, unless the toolchain supplies maps.</li>
+<li><strong>No performance superiority is claimed.</strong> The existing measurements are small, hand-written, and mostly show a memory advantage over stackful fibers (and parity with Tokio-class frames). See the <a href="../benchmarks/">evaluation plan</a>.</li>
+</ul>
+<h2 id="9-where-stackful-execution-remains">9. Where stackful execution remains<a class="headerlink" href="#9-where-stackful-execution-remains" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>As the reference semantics.</strong> The tests that decide whether a language feature is correct should pass under both implementations, which is cheap to arrange if the stackful runtime is kept working.</li>
+<li><strong>As a baseline</strong> for the evaluation plan: stackful fibers are the cost to beat on memory (4 KB floor, 4.1 KB resident at 1 KB state against Tokio's 1.4 KB).</li>
+<li><strong>For synchronous drivers</strong> on blocking-pool threads, where a foreign callback needs to call parking Strata code (<a href="../dispatch-and-ffi/#foreign-callbacks">dispatch</a>).</li>
+</ol>
+<p>It is no longer the primary implementation path. Spec section 6.1 is rewritten accordingly.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>

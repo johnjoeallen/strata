@@ -2,46 +2,74 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
     </url>
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/decisions/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
     </url>
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/open-questions/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
     </url>
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/repo-map/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
+    </url>
+    <url>
+         <loc>https://johnjoeallen.github.io/strata/dev/architecture/</loc>
+         <lastmod>2026-10-31</lastmod>
+    </url>
+    <url>
+         <loc>https://johnjoeallen.github.io/strata/dev/architecture/benchmarks/</loc>
+         <lastmod>2026-10-31</lastmod>
+    </url>
+    <url>
+         <loc>https://johnjoeallen.github.io/strata/dev/architecture/changes/</loc>
+         <lastmod>2026-10-31</lastmod>
+    </url>
+    <url>
+         <loc>https://johnjoeallen.github.io/strata/dev/architecture/dispatch-and-ffi/</loc>
+         <lastmod>2026-10-31</lastmod>
+    </url>
+    <url>
+         <loc>https://johnjoeallen.github.io/strata/dev/architecture/modules/</loc>
+         <lastmod>2026-10-31</lastmod>
+    </url>
+    <url>
+         <loc>https://johnjoeallen.github.io/strata/dev/architecture/open-decisions/</loc>
+         <lastmod>2026-10-31</lastmod>
+    </url>
+    <url>
+         <loc>https://johnjoeallen.github.io/strata/dev/architecture/suspension/</loc>
+         <lastmod>2026-10-31</lastmod>
     </url>
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/journey/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
     </url>
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/journey/01-why/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
     </url>
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/journey/02-foundations/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
     </url>
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/journey/03-http/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
     </url>
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/journey/04-comparison/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
     </url>
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/journey/05-mini-redis/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
     </url>
     <url>
          <loc>https://johnjoeallen.github.io/strata/dev/journey/06-locks/</loc>
-         <lastmod>2026-10-29</lastmod>
+         <lastmod>2026-10-31</lastmod>
     </url>
 </urlset>
