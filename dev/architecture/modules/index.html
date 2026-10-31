@@ -543,6 +543,33 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and access checking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -561,10 +588,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -582,8 +609,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -743,6 +770,17 @@
     <span class="md-ellipsis">
       
         Effect summaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#access-and-escape-summaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access and escape summaries
       
     </span>
   </a>
@@ -1174,6 +1212,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#access-and-escape-summaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access and escape summaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#call-graph-information" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1431,6 +1480,14 @@ invariants: cleanup methods are Never; foreign=blocking implies park=May
 </code></pre></div>
 <p><code>Cond(P)</code> is stored symbolically, so a downstream module can resolve it with its own arguments. A conditional effect through a type parameter (<code>T.compare</code> that might park) is stored as <code>Cond({T})</code> and resolved at instantiation.</p>
 <p>Summaries are <strong>inferred</strong>, then <strong>exported as part of the contract</strong>. The consequence, already noted for borrow origins in spec 5.1: changing an implementation can change the contract with no source signature change. The compiler reports it (<a href="#4-versioning-and-compatibility">versioning</a>).</p>
+<h3 id="access-and-escape-summaries">Access and escape summaries<a class="headerlink" href="#access-and-escape-summaries" title="Permanent link">&para;</a></h3>
+<p>Also part of each exported function's contract, and of each exported type (see <a href="../../sharing/">sharing</a>):</p>
+<div class="highlight"><pre><span></span><code>per borrowed or Ref parameter:  access = none | read | write      (through the receiver and by-value fields)
+                                escape = none | retained | published (stored beyond the call / given to spawn or a message)
+result:                         fresh  = yes | no                 (a new allocation nothing else refers to)
+per type field:                 mutability = write-once | mutable
+</code></pre></div>
+<p>These are what the compiler needs to report a missing or too-weak <code>sync</code>/<code>mutate</code> across modules without the callee's source. Changing a field from write-once to mutable, a parameter's access from read to write, or a result from fresh to not fresh is a breaking change.</p>
 <h3 id="call-graph-information">Call-graph information<a class="headerlink" href="#call-graph-information" title="Permanent link">&para;</a></h3>
 <p>Retained in Tier C, and also, in reduced form, in the contract:</p>
 <ul>

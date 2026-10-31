@@ -545,6 +545,33 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and access checking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     
     
     
@@ -559,10 +586,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -580,8 +607,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1004,6 +1031,10 @@
 <tr>
 <td>Compiler inserts budget checks in loops and recursion unless the function is tagged <code>nopark</code></td>
 <td>Long CPU work cannot monopolise a worker or defy cancellation; <code>nopark</code> gives plain C where the author wants it. Overhead still to be measured.</td>
+</tr>
+<tr>
+<td>One <code>Ref&lt;T&gt;</code>; sharing is inferred, not declared. <code>sync</code>/<code>mutate</code> required where the object is not provably local and the field is mutable; no-ops on unshared objects</td>
+<td>Programmer never decides what is shared; a missing or too-weak block is a compile error; layout and behaviour do not depend on other modules. Cost of per-instance flag still to measure.</td>
 </tr>
 <tr>
 <td>C stays the backend</td>
