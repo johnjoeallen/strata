@@ -71,7 +71,7 @@ Recommendation: 1 where available, 2 as the default for anything declared `exter
 
 C code calls a Strata function (a `qsort` comparator, a library event callback). The callback runs on whatever native stack C is using.
 
-- **Default (Direction):** a callback is compiled as `Never` (it may call only `Never` functions, and no budget check is inserted). Calling a `May` function from it is a compile error. Because a callback is invoked from C, it is `f_call`-only: nothing underneath it can be captured.
+- **Default (Direction):** a callback is compiled as `Never` (it may call only `Never` functions, and no slice check is inserted). Calling a `May` function from it is a compile error. Because a callback is invoked from C, it is `f_call`-only: nothing underneath it can be captured.
 - **Exception: callbacks that must park.** Declared as parking callbacks, they run on a **blocking-pool thread only**, under a **synchronous driver**: the wrapper calls `f_call`; on `PARKED` it blocks the OS thread on a wake-up object, and on the wake calls `f_resume` until `DONE`. Parking then blocks that thread, not a scheduler worker. This is the `block_on` of Strata. It is forbidden on scheduler workers (compile error if the call is made from a worker context that is not a pool thread; at minimum, a runtime check).
 - Exceptions cannot cross a C frame. The wrapper catches `THROWN` and converts it to the library's error convention or aborts. The binding says which.
 

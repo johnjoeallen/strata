@@ -57,7 +57,7 @@ Summary(f) = {
   park:    Never | May | Cond(P)
   throws:  set of exception types that can escape
   foreign: none | nonblocking | blocking          // reaches a foreign call (see dispatch page)
-  yields:  bool                                    // park=May only because of compiler-inserted budget checks ([yield]); cannot wait on I/O or a lock
+  yields:  bool                                    // park=May only because of compiler-inserted slice checks ([yield]); cannot wait on I/O or a lock
 }
 advisory (not hashed into the contract) = {
   loops:   none | bounded | long | unbounded       // loop and recursion class of f including its callees; feeds the loop warnings
@@ -195,7 +195,7 @@ Recompile module M when any of these changes:
 2. **A contract hash of any symbol M references.** Granularity is the symbol, not the whole imported module: M is not rebuilt because an unused export of a dependency changed.
 3. **Compiler, runtime ABI, module ABI, C compiler or flag set** (the cache key dimensions).
 4. **An inlined body, in optimised mode only:** if M's cached link-time product inlined or fused a function from N, and that function's Tier B/C IR hash changed.
-5. **Build configuration that affects closed-world decisions:** the set of open interfaces or the entry points. (Budget checks are chosen by `[yield]`/`[noyield]` in the source, so they are already in the source hash and in the effect summaries; there is no separate build setting to track. The lint level is not a dimension: warnings do not affect generated code.)
+5. **Build configuration that affects closed-world decisions:** the set of open interfaces or the entry points. (Slice checks are chosen by `[yield]`/`[noyield]` in the source, so they are already in the source hash and in the effect summaries; there is no separate build setting to track. The lint level is not a dimension: warnings do not affect generated code.)
 
 Not a reason to recompile M: a change in an imported function's body that leaves its contract hash alone (in incremental mode); a change in an unreferenced export.
 

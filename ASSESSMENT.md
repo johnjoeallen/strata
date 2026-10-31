@@ -227,10 +227,10 @@ Tokio. Go provides stronger automatic protection against that particular mistake
 *Update:* the author first chose these checks as the default, then reversed that: they are now opt-in per function or per type with `[yield]` (package level once packages exist), and nothing is inserted otherwise ([suspension 1.1](docs/architecture/suspension.md#11-attributes-yield-noyield-nopark)). The consequences below describe the check mechanism itself; the effect ripple applies only to functions that opt in.
 
 A compiler could insert checks on loop back-edges and selected function entries,
-then yield when a scheduling budget expires. This would cover ordinary loops and
+then yield when a scheduling slice expires. This would cover ordinary loops and
 recursion without requiring a programmer-written call at every point.
 
-The runtime must have a way to detect budget expiry while a task is running.
+The runtime must have a way to detect slice expiry while a task is running.
 A timestamp sampled at checks, an operation counter, or a flag updated by another
 thread or signal are possible approaches. A flag updated only by the occupied
 worker's scheduler would not provide that detection during a long computation.
@@ -319,7 +319,7 @@ This distinction changes the difficulty of preemption too. With established
 stackful switching, suspending a call chain can reuse that mechanism. With
 resumable frames, the compiler must preserve each affected call chain and resume
 location, including newly introduced scheduling checks. The update records this
-as a decision: compiler-inserted budget checks are opt-in with `[yield]` (per function or per type). Unmarked CPU-bound code can still stall a worker and cannot be cancelled; loop warnings, an advisory `loops` class in module files, and a watchdog diagnostic are the mitigations. The cost of a check is unmeasured ([D13](docs/architecture/open-decisions.md#d13-runaway-non-parking-code)).
+as a decision: compiler-inserted slice checks are opt-in with `[yield]` (per function or per type). Unmarked CPU-bound code can still stall a worker and cannot be cancelled; loop warnings, an advisory `loops` class in module files, and a watchdog diagnostic are the mitigations. The cost of a check is unmeasured ([D13](docs/architecture/open-decisions.md#d13-runaway-non-parking-code)).
 
 ### Risks introduced or sharpened by the module architecture
 

@@ -70,14 +70,14 @@ Recommended: not in `throws`, not catchable, runs cleanups. Alternative: a catch
 
 ## D13. Runaway non-parking code
 
-**Decided by the author:** the compiler inserts budget checks only in functions marked `[yield]`, or in a type (`struct Parser[yield]`) or, once packages exist, a package whose default is `[yield]`. The innermost level wins: function, then type, then package. `[noyield]` overrides an enclosing default; `[nopark]` asserts that nothing parks. With no attribute nothing is inserted. Mechanism and rules: [suspension 1.1](suspension.md#11-attributes-yield-noyield-nopark). Loops add no effect by default, so the library-tagging burden an earlier default-on design carried is gone.
+**Decided by the author:** the compiler inserts slice checks only in functions marked `[yield]`, or in a type (`struct Parser[yield]`) or, once packages exist, a package whose default is `[yield]`. The innermost level wins: function, then type, then package. `[noyield]` overrides an enclosing default; `[nopark]` asserts that nothing parks. With no attribute nothing is inserted. Mechanism and rules: [suspension 1.1](suspension.md#11-attributes-yield-noyield-nopark). Loops add no effect by default, so the library-tagging burden an earlier default-on design carried is gone.
 
 The price is that unmarked CPU-bound code can stall a worker and cannot be cancelled. Mitigations, all Direction: loop warnings with an advisory `loops` class in the module summary ([suspension 1.3](suspension.md#13-loop-warnings)), a watchdog diagnostic that reports a worker making no progress past a threshold and names the function it is in (it reports and does not interrupt), and the type-level (later package-level) default for CPU-heavy code. Open: the package notion itself, and whether the attribute spelling should be unified between functions and types.
 
 Still open:
 
 - **Overhead of a check** in a `[yield]` loop. Unmeasured; strip-mining and small-bound elision are expected to keep it low. Benchmark B13.
-- **Budget unit.** An iteration counter (cheap, not time) against a timestamp or a flag set from another thread. Recommendation: counter, sized in iterations per check block; the watchdog flag later.
+- **Slice unit.** An iteration counter (cheap, not time) against a timestamp or a flag set from another thread. Recommendation: counter, sized in iterations per check block; the watchdog flag later.
 - **Lambdas** inheriting the enclosing function's setting.
 - **Default revisited.** Whether checks should become the default later, once B13 and a real compiler show the cost and the ripple. The earlier design made them the default and was reversed before any implementation.
 - **Interaction with the lazy shape.** A check is a park point inside a loop, so the loop's live values must be spillable; a loop with borrowed locals falls under [D2](#d2-borrowed-locals-and-the-lazy-shape) too.

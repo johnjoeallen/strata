@@ -21,7 +21,7 @@ A function's own body can park only through these, and the analysis starts from 
 2. Entering `sync`/`mutate` (it queues FIFO, see spec 7.1). The body of the block can never park, so a lock is never held across a suspension.
 3. A call to a function whose summary is `May`, or `Cond(P)` with a member of `P` bound to something that may park.
 4. A call through an interface or function value whose declared bound permits parking (see [dispatch](dispatch-and-ffi.md#interface-calls)).
-5. A **compiler-inserted budget check**, only in a function that asks for one with `[yield]`, on the function itself or through its type or package (section 1.1). The check sits on loop back-edges and recursive-call entries of that function's own body; when the budget is exhausted the task yields, which is an ordinary park point. Without `[yield]` the compiler inserts nothing.
+5. A **compiler-inserted slice check**, only in a function that asks for one with `[yield]`, on the function itself or through its type or package (section 1.1). The check sits on loop back-edges and recursive-call entries of that function's own body; when the slice is exhausted the task yields, which is an ordinary park point. Without `[yield]` the compiler inserts nothing.
 6. A call to a blocking foreign function that the runtime offloads (see [blocking FFI](dispatch-and-ffi.md#blocking-foreign-calls)).
 
 Cleanup methods are `Never` by rule (spec section 9). A cleanup that tries to call a `May` function is a compile error, which is already the behaviour for `sync`/`mutate` bodies.
@@ -53,7 +53,7 @@ Across modules the same computation runs on summaries (a few words per function)
 
 Three attributes on a function (`fn[yield] name(...)`). Spellings are the author's; the rest is Direction.
 
-| Attribute | Budget checks | May wait on I/O or a lock | Meaning |
+| Attribute | Slice checks | May wait on I/O or a lock | Meaning |
 |---|---|---|---|
 | none | none, unless an enclosing type or package says `[yield]` | inferred | The default: nothing inserted |
 | `[yield]` | inserted in this function's own loops and recursion | inferred | "The compiler may yield for me here" |
@@ -76,12 +76,12 @@ Three attributes on a function (`fn[yield] name(...)`). Spellings are the author
 - **Spelling.** The attribute follows `fn` on a function and the name on a type, which differ; whether to unify them (`fn f[yield]`) is **Open**.
 - **Own body only.** `[yield]` does not make callees yield. It is shorthand for a `yield()` every N iterations of the function's own loops. Its callers become `May` by ordinary inference.
 - **The effect widens only if a check is inserted.** A `[yield]` function with no loop or recursion stays `Never`; tagging it causes no ripple.
-- **What a check is:** a counter decrement and a rarely taken branch. On exhaustion the task goes to the back of the run queue and resumes in its turn: a park point, so live values are spilled to a frame as for any park. A check is also a cancellation point, so a task in a `[yield]` loop can be cancelled (section 4).
+- **What a check is:** a counter decrement and a rarely taken branch. The counter is the task's **slice**: the amount of work (a count of loop iterations) it may do before it must give the worker up. It is the time slice of a scheduler, and has nothing to do with array slices such as `buf[..n]`. On exhaustion the task goes to the back of the run queue and resumes in its turn: a park point, so live values are spilled to a frame as for any park. A check is also a cancellation point, so a task in a `[yield]` loop can be cancelled (section 4).
 - **Cost control (Direction):** strip-mine loops so the counter is tested once per block of iterations; omit the check for loops with a small constant bound. Neither is guaranteed. The overhead is a measurement to take, not assume (benchmarks B13).
 - **`[nopark]` is the strict form.** It is the only form that guarantees the function is `Never`. `[noyield]` still permits a call to `recv`. It is an optional assertion, never required, and never mentioned by callers; it turns a silent effect change into a compile error at a library boundary.
 - **Lambdas** inherit the setting of the enclosing function (**Open**).
 - **`[yield]` is not the `yield()` call.** `yield()` is an `extern parks fn` the program calls itself. The attribute only lets the compiler insert yields.
-- **Limits:** the budget bounds how long a *checked* region runs. It does not bound a function without `[yield]`, a plain `extern fn`, or a single indivisible library operation. Such code stalls its worker and cannot be cancelled until it returns. The loop warnings in 1.3 exist to find it.
+- **Limits:** the slice bounds how long a *checked* region runs. It does not bound a function without `[yield]`, a plain `extern fn`, or a single indivisible library operation. Such code stalls its worker and cannot be cancelled until it returns. The loop warnings in 1.3 exist to find it.
 
 ### 1.2 Calls allowed in `sync`/`mutate` bodies, cleanups and C callbacks
 
@@ -153,11 +153,11 @@ Illustrative Strata source and C. Neither is compiler output.
 // http/headers.stra
 package http
 
-// Opted in: the compiler inserts a budget check in this loop. May, yields only.
+// Opted in: the compiler inserts a slice check in this loop. May, yields only.
 fn[yield] parseHeaders(buf: u8[]&): Headers throws BadRequest {
     var h = Headers();
     var i = 0;
-    while i < buf.len {              // back-edge: budget check inserted here
+    while i < buf.len {              // back-edge: slice check inserted here
         let line = nextLine(buf, i);
         h.add(line);
         i = line.end;
@@ -205,7 +205,7 @@ imaging/
 
 ```cpp
 // imaging/renderer.stra
-package[yield] imaging                    // package default: functions here get budget checks
+package[yield] imaging                    // package default: functions here get slice checks
 
 struct Renderer {                         // no attribute: inherits [yield] from the package
     fn render(page: Page&): string { for b in page.blocks { ... } }   // gets checks
@@ -241,7 +241,7 @@ st_t parseHeaders_call(task_t *t, u8buf *buf, Headers *out) {
     Headers h = headers_new();
     size_t i = 0;
     while (i < buf->len) {
-        if (--t->worker->budget <= 0) {              // budget check
+        if (--t->worker->slice <= 0) {              // slice check
             // a yield is a real park: spill live values into a frame
             parse_frame *f = frame_new(t, parseHeaders_resume, /*state*/ 1);
             f->buf = buf; f->h = h; f->i = i;        // buf is a borrowed parameter, see D2
@@ -409,7 +409,7 @@ Cooperative, as in spec 6.2: the cancelling party marks the task and wakes it. A
 
 Cancellation is **not an ordinary exception**: it is not named in `throws`, and `catch` cannot swallow it. Letting `catch (Exception)` swallow it would make cancellation unreliable; requiring it in `throws` would put the effect back in signatures everywhere. This choice interacts with the open exception-model question (spec 10.7) and is stated here as Direction only.
 
-A task can be cancelled at any park point, including a budget check, so a task spinning in a `[yield]` loop is cancellable. A task in a loop without `[yield]`, a `nopark` function, a plain `extern fn` or an indivisible library operation is not, until it returns.
+A task can be cancelled at any park point, including a slice check, so a task spinning in a `[yield]` loop is cancellable. A task in a loop without `[yield]`, a `nopark` function, a plain `extern fn` or an indivisible library operation is not, until it returns.
 
 ### Deterministic cleanup
 

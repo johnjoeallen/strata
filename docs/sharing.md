@@ -173,7 +173,7 @@ A consumer of `db.smod` can run every check above with no source. An implementat
 // sync(store) { ... } where store is incoming
 bool sh = obj_is_shared(store);                  // one load of the control-block flag
 if (sh) { st_t s = rwlock_read_enter(t, &store->lock); /* may park; PARKED unwinds as usual */ }
-/* body: no parking inside, no budget checks */
+/* body: no parking inside, no slice checks */
 if (sh) rwlock_read_exit(&store->lock);          // on every exit path, including throws
 ```
 
