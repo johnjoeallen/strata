@@ -1,8 +1,8 @@
 // redis/types.stra - the vocabulary of the library: argument views, scan results, exceptions.
 // The original's Frame enum (Simple, Error, Integer, Bulk, Null, Array) is split by direction: requests are scanned into offsets (Arg, below),
 // replies are written straight to the socket (Writer, redis/reply.stra). Neither builds a tree of heap-allocated frames.
-import runtime.leaves
-import redis.limits
+package redis
+import runtime
 
 exception ProtocolError { message: string }              // malformed input. The server answers "-ERR <message>" and closes (the original closes silently)
 exception FrameTooLarge                                  // a declared length or the frame as a whole is over its limit; "-ERR frame too large", then close

@@ -1,9 +1,7 @@
 // http/reader.stra - the connection's input reader: owns the buffer and any leftovers, finds request heads, and drives the body readers.
 // C counterpart: http/http_reader.h (read_request_step), runtime/rt_buf.h (size classes) and the admission loop of conc_step (server.c).
-import runtime.leaves
-import http.types
-import http.config
-import http.body
+package http
+import runtime
 
 // ---------- the connection's input reader (library type: owns the buffer and the leftovers) ----------
 // Unconsumed input is buf[start..end]. A finished request is consumed by advancing `start` (no copy). Bytes are

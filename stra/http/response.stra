@@ -1,6 +1,6 @@
 // http/response.stra - canned responses, the reason-phrase switch, and the Connection: header rule.
 // C counterpart: http/http_msg.h (reason_phrase, mk_resp, init_responses, conn_header).
-import http.types
+package http
 
 struct ResponseTable {
     ok: Resp, okClose: Resp, okKa: Resp, notFound: Resp, badRequest: Resp, headersTooLarge: Resp, payloadTooLarge: Resp, notImplemented: Resp, serverError: Resp

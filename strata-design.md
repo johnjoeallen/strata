@@ -42,7 +42,7 @@ Strata explores retaining those ideas where useful while supporting:
       whether they are bounded before anything is held behind them.
     - The compiler may optimize freely only where behaviour is unobservable (see 4.4); it must preserve identity,
       destructor timing and ordering.
-    - **The one exception is parking.** Parking includes yielding at compiler-inserted budget checks, but the compiler inserts those only in a function marked `[yield]` (or in a file marked so); with no attribute it inserts nothing. A call that may wait looks like an ordinary blocking call: no `async`/`await`,
+    - **The one exception is parking.** Parking includes yielding at compiler-inserted budget checks, but the compiler inserts those only in a function marked `[yield]` (or in a type or package marked so); with no attribute it inserts nothing. A call that may wait looks like an ordinary blocking call: no `async`/`await`,
       no function colouring. The compiler infers which functions may park (the may-park effect) and sizes their
       frames. Because this is hidden by design, tooling must make it visible (hover, lints, and error messages that
       name the call chain), and parking inside `sync`/`mutate` is a compile error.
@@ -79,6 +79,8 @@ Direct `WeakRef<T>` access may optionally use implicit temporary promotion and r
 ### 3.2 Parent–child relationships
 
 ```cpp
+package app
+
 struct Parent {
     children: Ref<Child>[]
 }
@@ -153,7 +155,9 @@ The compiler may place objects in task-local storage only if it proves they cann
 Lifetime parameters are **not** written as named generics. Borrowing is expressed with `T&`; the compiler infers which parameters, object fields or static objects the returned borrow depends on.
 
 ```cpp
-fn choose(a: Customer&, b: Customer&, first: bool) -> Customer& {
+package app
+
+fn choose(a: Customer&, b: Customer&, first: bool): Customer& {
     if first { return a; }
     return b;
 }
@@ -183,6 +187,8 @@ C declarations contain no trustworthy ownership or lifetime semantics. Bindings 
 Strata aims for Java-virtual-thread-style programming: thousands of logical tasks running ordinary blocking-looking code on a limited number of OS workers.
 
 ```cpp
+package app
+
 fn serve(listener: Listener&) {
     loop {
         let socket = listener.accept();
@@ -200,7 +206,7 @@ The **programming model** is virtual threads with stackful-like semantics: local
 - The compiler infers the **may-park effect** (principle 10) transitively over the call graph. A function that cannot park compiles to an ordinary C function. A function that may park is lowered to a state machine whose frame holds exactly the values live across its park points.
 - Preferred shape: a native-stack fast path, with frames created only while a real park unwinds, and the scheduler resuming the innermost frame directly. Eager and embedded frames are alternatives chosen per function. Frames never move.
 - No `async`/`await`: suspension capability propagates through the call graph without syntax at each level.
-- **Budget checks (decided, opt-in):** a function marked `[yield]`, or any function in a file whose default is `[yield]`, gets a cheap check on its loop back-edges and recursive calls; when the budget runs out the task yields, and the check is also a cancellation point. `[noyield]` overrides the file default. `[nopark]` asserts the function never parks, so any park source in it is a compile error. With no attribute the compiler inserts nothing, and loops add no effect. Code in `sync`/`mutate` bodies, cleanups and C callbacks may call only `Never` functions. A lint warns about unbounded and long loops (`loops` class in the module summary). Overhead of a check is unmeasured (`docs/architecture/benchmarks.md`, B13).
+- **Budget checks (decided, opt-in):** a function marked `[yield]`, or any method of a type written `struct T[yield]` (and later any function in a package so marked; the innermost level wins), gets a cheap check on its loop back-edges and recursive calls; when the budget runs out the task yields, and the check is also a cancellation point. `[noyield]` overrides an enclosing default. `[nopark]` asserts the function never parks, so any park source in it is a compile error. With no attribute the compiler inserts nothing, and loops add no effect. Code in `sync`/`mutate` bodies, cleanups and C callbacks may call only `Never` functions. A lint warns about unbounded and long loops (`loops` class in the module summary). Overhead of a check is unmeasured (`docs/architecture/benchmarks.md`, B13).
 - Scheduling: an OS-thread worker pool of configurable size, nonblocking sockets plus `epoll` on Linux, scheduler-aware `read`, `write`, `accept`, timers and waits. Synchronization waits **park virtual threads**, not carrier threads. Task-local globals and arenas belong to the vthread. Start with thread-affine tasks; migration and work stealing come later.
 - Blocking native calls are explicit: a plain `extern fn` is a promise of a short, nonblocking call; a call that may block is declared as such and is run by the runtime on a blocking pool (`docs/architecture/dispatch-and-ffi.md`). A blocking call must never silently stall a worker.
 - Conservative contracts: calls through interfaces and function values compile against a declared effect bound (default may-park), so a later change of an implementation cannot make a compiled caller unsafe.
@@ -241,7 +247,7 @@ mutate(cache) {
 }
 ```
 
-The compiler rejects mutation inside `sync`, unsynchronized access to objects that may be concurrently mutated, and borrowed references that escape a protected block. References used *within* the block may be borrowed; values crossing the boundary require an independent lifetime (e.g., copy/move or a safely acquired owning reference). Deep copies must be explicit in the semantic specification for compound values, even if the source syntax elides the operation.
+The compiler rejects mutation inside `sync`, unsynchronized access to objects that may be concurrently mutated (precisely defined in 7.3: an object that is not provably local, through a mutable field), and borrowed references that escape a protected block. References used *within* the block may be borrowed; values crossing the boundary require an independent lifetime (e.g., copy/move or a safely acquired owning reference). Deep copies must be explicit in the semantic specification for compound values, even if the source syntax elides the operation.
 
 Locks are automatically released on every exit path, including errors, exceptions and any supported non-local returns.
 
@@ -258,9 +264,11 @@ Requested ordering policy: fair FIFO admission of access requests, batching cons
 Application code should not need to write synchronization blocks for each cache operation:
 
 ```cpp
-fn cacheGet(cache: Ref<Cache>, key: i64) -> i64 {
+package app
+
+fn cacheGet(cache: Ref<Cache>, key: i64): i64 {
     sync(cache) {
-        return cache.entries.get(key); // scalar copied before unlock
+        return cache.entries.get(key); // scalar copied before unlock; the block is required because cache is incoming and entries is mutable (7.3)
     }
 }
 
@@ -363,7 +371,7 @@ Dedicated virtual reservations, as in Goose, remain the candidate for large in-m
 8. **Virtual-thread stacks:** Largely superseded by 6.1 (resumable frames). Remains for the stackful baseline and for fast-path native-stack depth in recursive functions. Related open items (lazy frames with borrowed locals, FFI, fusion): `docs/architecture/open-decisions.md`.
 9. **Synchronized callbacks and escaping values:** How to handle callbacks, function pointers, composite references and nested transactions safely.
 10. **API stability:** Direction: contract hashes per symbol, format/ABI versions, contract diffs and a rule that widening an effect is breaking (`docs/architecture/modules.md`). Open: the enforcement policy and the spelling of the optional effect assertion.
-11. **Compilation architecture:** where continuation lowering happens, the minimum IR for cross-module optimisation, fusion across modules, debugging maps, dynamic loading (`docs/architecture/open-decisions.md`, D1 to D13).
+11. **Compilation architecture:** where continuation lowering happens, the minimum IR for cross-module optimisation, fusion across modules, debugging maps, dynamic loading (`docs/architecture/open-decisions.md`, D1 to D14).
 
 ## 11. Suggested implementation sequence
 
@@ -432,6 +440,7 @@ Strata source -> parse/semantic analysis -> typed Strata IR
    -> continuation lowering -> generated C -> C compiler and linker -> executable
 ```
 
+0. **Packages.** Every source file starts with `package name`. The files sharing a name form a package, which compiles to one `.smod`; declarations are visible across the package with no import, and `import other` names another package. A package declaration may carry `[yield]`, `[noyield]` or `[nopark]` as the default for its functions (in one file only), overridden by a type and then by a function. Placeholder syntax; details in `docs/architecture/open-decisions.md` (D14).
 1. **Module contents come in tiers.** Tier A (contract) is required for correctness; Tier B (generic and exposed bodies) for instantiation; Tier C (the rest of the IR, call-graph edges, park-point tables) only for optimisation. A program links correctly with Tier A and the Level-0 ABI alone.
 2. **Level-0 ABI** is the stable boundary: calling convention, `DONE/THROWN/PARKED` status, the frame header, vtable layout, exported type layout. A function's frame *body* is private, so changing it never breaks callers.
 3. **Two build modes.** Incremental: each module compiled and lowered independently against imported contracts; unchanged contract hashes stop the rebuild. Optimised: whole-application analysis over retained IR; re-lowers only chains it changes.

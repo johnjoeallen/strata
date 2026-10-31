@@ -1,9 +1,7 @@
 // redis/command.stra - the commands. Original: cmd/mod.rs (Command enum + from_frame), cmd/get.rs, set.rs, publish.rs, ping.rs, unknown.rs, and the
 // parsing half of subscribe.rs. Arguments are BORROWED views into the reader's buffer; they are valid until Reader.finish(). Whatever the
 // database keeps is copied by the database, once.
-import redis.types
-import redis.limits
-import redis.connection
+package redis
 
 enum Command {
     Get(key: u8[]&)

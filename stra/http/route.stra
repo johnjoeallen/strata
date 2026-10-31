@@ -1,8 +1,6 @@
 // http/route.stra - routes: which reader a handler uses, what a route declares (safe, cost), and how a handler is run.
 // C counterpart: route() and the simulated handlers in server.c (the route TABLE itself is part of the server).
-import http.types
-import http.response
-import http.body
+package http
 
 // ---------- routes and handlers ----------
 // Each route states, up front, what the library needs to know to run requests concurrently and safely:

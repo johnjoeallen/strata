@@ -11,9 +11,9 @@
 | Interfaces, function values, FFI | Spec 5.2, 9, 10.9 mention them | Bound-based dispatch, `extern blocking`, callbacks, dynamic loading rules |
 | Evaluation | Spec Phase 6: "against Tokio or Java vthreads" | A workload set, ground rules, ceremony metrics, build metrics |
 | Sharing | Undecided: `shared var`, shareable `Ref<T>`, or a type-level declaration | One `Ref<T>`; sharing inferred; blocks required by path analysis ([sharing](../sharing.md)) |
-| Open questions | 10.8 stacks, 10.10 API stability | Superseded and refined into [D1 to D13](open-decisions.md) |
+| Open questions | 10.8 stacks, 10.10 API stability | Superseded and refined into [D1 to D14](open-decisions.md) |
 
-The syntax of existing Strata is unchanged. Proposed additions, each marked placeholder and Open: the attributes `[yield]`, `[noyield]` and `[nopark]` (control of compiler-inserted budget checks and an assertion of no parking), and `extern blocking`.
+The syntax of existing Strata is unchanged. Proposed additions, each marked placeholder and Open: the `package` declaration (placeholder), the attributes `[yield]`, `[noyield]` and `[nopark]` (control of compiler-inserted budget checks and an assertion of no parking), and `extern blocking`.
 
 ## Contradictions found, and how each is resolved
 
@@ -22,14 +22,14 @@ The syntax of existing Strata is unchanged. Proposed additions, each marked plac
 3. **"Lifetime contracts are compile-time only" vs executables needing effect info.** Spec 5.1 says metadata is a compile-time dependency and the executable need not contain it. Still true for Tier A; but park-point tables (debug) and Level-0 entry names are in the executable if tooling is wanted. **Resolved:** debug sections are optional and separable.
 4. **Borrow across a park vs the lazy frame strategy.** The `lazy` measurements assumed no borrowed locals. **Flagged:** [D2](open-decisions.md#d2-borrowed-locals-and-the-lazy-shape).
 5. **"No hidden behaviour" vs inferred effects ripple.** An implementation change can now change a contract. **Flagged, partly resolved:** the exception in principle 10 is extended to effect contracts, mitigated by contract diffs, optional assertions and a version policy ([D4](open-decisions.md#d4-representing-effects-in-public-interfaces)).
-6. **Cooperative cancellation and scheduling vs tasks that never park.** Previously a limitation. **Resolved by decision:** the compiler inserts budget checks only in functions marked `[yield]` (or a file marked so), which makes those loops yield and cancellation points. Unmarked CPU-bound code can still stall a worker; warnings, a watchdog and the file-level default address it. Remaining gaps and the overhead question are in [D13](open-decisions.md#d13-runaway-non-parking-code).
+6. **Cooperative cancellation and scheduling vs tasks that never park.** Previously a limitation. **Resolved by decision:** the compiler inserts budget checks only in functions marked `[yield]` (or a type, later a package, marked so), which makes those loops yield and cancellation points. Unmarked CPU-bound code can still stall a worker; warnings, a watchdog and the type-level default address it. Remaining gaps and the overhead question are in [D13](open-decisions.md#d13-runaway-non-parking-code).
 7. **Foreign callbacks vs vthreads.** A callback cannot be suspended. **Resolved** by the `Never` default and the synchronous driver on pool threads.
 
 ## Outstanding decisions
 
 Short list; reasoning in [open decisions](open-decisions.md).
 
-D1 where lowering happens; D2 borrowed locals; D3 minimum IR; D4 effects in public interfaces; D5 recursion and dispatch limits; D6 generics; D7 fusion across modules; D8 debugging and profiling; D9 dynamic loading; D10 blocking FFI; D11 compatibility policy and caches; D12 cancellation semantics; D13 budget-check overhead and unit (mechanism decided: opt-in `[yield]`).
+D1 where lowering happens; D2 borrowed locals; D3 minimum IR; D4 effects in public interfaces; D5 recursion and dispatch limits; D6 generics; D7 fusion across modules; D8 debugging and profiling; D9 dynamic loading; D10 blocking FFI; D11 compatibility policy and caches; D12 cancellation semantics; D13 budget-check overhead and unit (mechanism decided: opt-in `[yield]`); D14 packages and imports.
 
 ## Not yet verified anywhere
 

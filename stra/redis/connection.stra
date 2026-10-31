@@ -2,10 +2,8 @@
 // Same shape as http/reader.stra: the buffer comes from the runtime's size classes only while there is unconsumed input, so an idle connection
 // owns none; it grows class by class up to Limits.maxFrame and no further. There is ONE non-parking read; a loop that must also wait on a
 // mailbox or on shutdown uses the same call, and waits with waitAny when it says Idle.
-import runtime.leaves
-import redis.types
-import redis.frame
-import redis.limits
+package redis
+import runtime
 
 struct Reader {
     conn: Conn&

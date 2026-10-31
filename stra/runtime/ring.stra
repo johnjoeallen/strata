@@ -1,6 +1,6 @@
 // runtime/ring.stra - a fixed-capacity circular queue. Generic: it knows nothing about requests or completion.
 // C counterpart: none as a type. The concurrent server keeps its ring of in-flight requests inline in conc_step (server.c).
-import runtime.leaves
+package runtime
 
 // Ring<T> is only a container: a fixed-capacity circular queue. It knows nothing about requests or completion.
 // Its storage comes from a pool (256 B for depth 32), so a connection with nothing in flight owns none.

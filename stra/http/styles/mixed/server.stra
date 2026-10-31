@@ -3,16 +3,8 @@
 // declared in the struct, with its comment, and implemented as `fn Server::name` below, where `self` is written out (C++ style). The struct stays short
 // enough to read as the outline of the server.
 // Behaviour is identical to ../../server.stra; only the way the server's own functions are grouped into a type differs.
-import runtime.leaves
-import runtime.io
-import runtime.ring
-import http.types
-import http.config
-import http.response
-import http.route
-import http.body
-import http.reader
-import http.pipeline
+package http                                      // an alternative to http/server.stra in another syntax style; the styles are not compiled together
+import runtime
 
 let routes = [
     Route.get ("/",           index,  Cost.Bounded(20us)),      // server.c: GET /            (spin_work, optional sleep)
@@ -32,7 +24,7 @@ fn echo(head: u8[]&): Resp {
     return ok(pathParam(head) + "\n")
 }
 
-fn report(head: u8[]&): Resp { return ok(expensiveSummary()) }   // long, but never parks
+fn report(head: u8[]&): Resp { return ok(expensiveSummary()) }   // long, but never parks: Never, not [yield], so it holds the worker for its ~1 ms (hence Cost.Unbounded)
 
 fn save(head: u8[]&): Resp { return ok(HELLO) }   // server.c: POST / has no body and changes no state;
                                                   //     it exists to be an UNSAFE request (a barrier)
@@ -53,7 +45,7 @@ fn storeUpload(head: u8[]&, upload: Upload&): Resp {   // server.c: POST /upload
     return ok("stored " + upload.length() + " bytes in file crc32=" + hex(upload.digest()) + "\n")
 }
 
-fn importRows(head: u8[]&, upload: Upload&): Resp throws Exception {   // (CPU-bound over a big input: declared Unbounded)
+fn[yield] importRows(head: u8[]&, upload: Upload&): Resp throws Exception {   // (CPU-bound over a big input: declared Unbounded; [yield] lets the compiler yield in the row loop, so other connections and cancellation get a turn)
     // The body is already a file; the handler never holds the document as a value. It maps the file and runs a streaming parser over it,
     // so memory stays constant however large the upload is.
     let rows = json.stream<Row>(upload.map())

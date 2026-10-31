@@ -1,6 +1,7 @@
 // http/types.stra - the vocabulary of the HTTP library: requests, responses, methods, route costs, read results, exceptions.
 // C counterpart: http/http_msg.h (Resp), http/http_reader.h, and the tag values in server.c.
-import runtime.leaves
+package http
+import runtime
 
 struct Resp  { bytes: u8[]&, keepAlive: bool }          // static text built at startup, or built by the handler
 struct Request { start: usize, end: usize }              // offsets of the head inside the reader's buffer, not a pointer

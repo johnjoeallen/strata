@@ -4,9 +4,9 @@ usage: strata2html.py server.stra [out.html]     (default out: <name>.strata.htm
 No dependencies. The page follows the system light/dark setting. The text of the page is exactly the source (checked with --verify)."""
 import html, re, sys, os
 
-KEYWORDS = set("fn let var struct enum exception const import static if else while for in switch default return break continue try catch throw spawn scope "
+KEYWORDS = set("fn let var struct enum exception const package import static if else while for in switch default return break continue try catch throw spawn scope "
                "true false null self assert impl as".split())
-EFFECTS = set("extern parks noparks throws".split())             # the places a program states an effect
+EFFECTS = set("extern parks blocking nopark noyield throws".split())             # the places a program states an effect
 BUILTIN_TYPES = set("u8 u16 u32 u64 usize bool string Duration Instant Exception".split())
 NOT_CALLS = KEYWORDS | EFFECTS | {"fn"}
 
@@ -136,7 +136,7 @@ pre.code.wrap .line {{ white-space: pre-wrap; word-break: break-word; }}
   <h1>{name}</h1>
   <div class="sub">{lines} lines &middot; pseudo-Strata &middot; generated from <code>{src}</code> by <code>strata2html.py</code> &middot; the text on this page is the source, unchanged</div>
   <div class="legend">
-    <span class="k">keyword</span><span class="t">type</span><span class="f">function</span><span class="e">effect keyword (extern, parks, noparks, throws)</span>
+    <span class="k">keyword</span><span class="t">type</span><span class="f">function</span><span class="e">effect keyword (extern, parks, blocking, nopark, noyield, throws)</span>
     <span class="s">string</span><span class="n">number</span><span class="mod">module</span><span class="const">CONSTANT</span><span class="lab">label</span><span class="c">comment</span>
   </div>
   <div class="tools"><button id="wrap" type="button">Wrap lines</button><button id="theme" type="button">Light / dark</button></div>

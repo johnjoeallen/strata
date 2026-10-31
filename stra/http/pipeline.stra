@@ -1,9 +1,7 @@
 // http/pipeline.stra - what a pipelined connection keeps: the completed-prefix buffer and the ordered set of in-flight requests.
 // C counterpart: inline in conc_step (server.c): the ring of Req, the collect loop, and the barrier checks.
-import runtime.leaves
-import runtime.ring
-import http.types
-import http.route
+package http
+import runtime
 
 // What gets sent: completed responses appended in request order into one pool buffer, ready for one write. Dropping a
 // Prefix returns its buffer to the pool.

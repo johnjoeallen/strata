@@ -2,8 +2,7 @@
 // Original: frame.rs `Frame::check` followed by `Frame::parse` (two passes, every element copied into a heap tree). Here the bytes stay in the
 // reader's buffer and Args holds offsets; only what the database keeps is copied, later.
 // Limits are enforced from the LENGTH LINES, before the bytes they announce are read (principle 11).
-import redis.types
-import redis.limits
+package redis
 
 const MAX_LINE: usize = 32                               // the longest header or length line ("*64", "$1048576", ":18446744073709551615" with room to spare)
 

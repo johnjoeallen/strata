@@ -1,7 +1,7 @@
 // http/body.stra - request bodies: the framing decoder (Content-Length, chunked), the two sinks, and the Body / Upload types.
 // C counterpart: http/http_body.h (Body, body_framing, body_feed, sink_write, body_free).
-import runtime.leaves
-import http.types
+package http
+import runtime
 
 // ---------- request bodies ----------
 // Both readers decode the body as a STREAM through the connection's input buffer (Content-Length and chunked alike), enforce the limit as

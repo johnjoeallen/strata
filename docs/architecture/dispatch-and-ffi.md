@@ -41,7 +41,9 @@ A library that is only available as a native object and header (no `.smod`) is a
 C declarations carry no ownership or effect information (spec 5.2). A Strata binding must state it:
 
 ```
-extern fn crc32(data: u8[]&) -> u32                  // plain: Never. Assumed short and non-blocking.
+package bindings
+
+extern fn crc32(data: u8[]&): u32                  // plain: Never. Assumed short and non-blocking.
 extern parks fn sleep(d: Duration)                   // existing: a runtime primitive that registers and parks
 extern blocking fn pqExec(c: PgConn&, sql: string&) // proposed: may block the OS thread (see below)
 ```

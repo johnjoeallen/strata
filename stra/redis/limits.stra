@@ -2,6 +2,8 @@
 // The original (orig/src) has none of these: `Vec::with_capacity(len)` takes its size straight from the wire, the read buffer and the
 // database are unbounded, and the pub/sub queue silently drops. C counterpart: the options in server.c main().
 
+package redis
+
 const MAX_ARGS: usize = 64                               // arguments in one command (also the size of Args.items). SUBSCRIBE a b c ... is capped by it
 
 // What the server does when a subscriber's mailbox is full because the client reads too slowly.

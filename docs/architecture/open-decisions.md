@@ -70,9 +70,9 @@ Recommended: not in `throws`, not catchable, runs cleanups. Alternative: a catch
 
 ## D13. Runaway non-parking code
 
-**Decided by the author:** the compiler inserts budget checks only in functions marked `[yield]`, or in a file whose default is `[yield]`. `[noyield]` overrides the file default; `[nopark]` asserts that nothing parks. With no attribute nothing is inserted. Mechanism and rules: [suspension 1.1](suspension.md#11-attributes-yield-noyield-nopark). Loops add no effect by default, so the library-tagging burden an earlier default-on design carried is gone.
+**Decided by the author:** the compiler inserts budget checks only in functions marked `[yield]`, or in a type (`struct Parser[yield]`) or, once packages exist, a package whose default is `[yield]`. The innermost level wins: function, then type, then package. `[noyield]` overrides an enclosing default; `[nopark]` asserts that nothing parks. With no attribute nothing is inserted. Mechanism and rules: [suspension 1.1](suspension.md#11-attributes-yield-noyield-nopark). Loops add no effect by default, so the library-tagging burden an earlier default-on design carried is gone.
 
-The price is that unmarked CPU-bound code can stall a worker and cannot be cancelled. Mitigations, all Direction: loop warnings with an advisory `loops` class in the module summary ([suspension 1.3](suspension.md#13-loop-warnings)), a watchdog diagnostic that reports a worker making no progress past a threshold and names the function it is in (it reports and does not interrupt), and the file-level default for CPU-heavy modules.
+The price is that unmarked CPU-bound code can stall a worker and cannot be cancelled. Mitigations, all Direction: loop warnings with an advisory `loops` class in the module summary ([suspension 1.3](suspension.md#13-loop-warnings)), a watchdog diagnostic that reports a worker making no progress past a threshold and names the function it is in (it reports and does not interrupt), and the type-level (later package-level) default for CPU-heavy code. Open: the package notion itself, and whether the attribute spelling should be unified between functions and types.
 
 Still open:
 
@@ -81,3 +81,15 @@ Still open:
 - **Lambdas** inheriting the enclosing function's setting.
 - **Default revisited.** Whether checks should become the default later, once B13 and a real compiler show the cost and the ripple. The earlier design made them the default and was reversed before any implementation.
 - **Interaction with the lazy shape.** A check is a park point inside a loop, so the loop's live values must be spillable; a loop with borrowed locals falls under [D2](#d2-borrowed-locals-and-the-lazy-shape) too.
+
+## D14. Packages and imports
+
+*Direction for the samples; the details are open.* The sample `.stra` files now all start with `package name`.
+
+- **Rule used in the samples.** A package is the set of files that declare the same name. It compiles to one `.smod`. Declarations are visible across the package's files with no import. `import other` names another package, so `import redis.types` inside `redis` is gone and `import runtime.leaves` became `import runtime`. The package default for `[yield]`, `[noyield]` and `[nopark]` is written on the package declaration in one file, by convention `package.stra`.
+- **Directory or declared name.** Alternatives: the directory is the package (simple, no repeated name), or the name is declared in each file (allows the three syntax variants of `http/server.stra` to be alternatives within `http`, and allows moving files freely). The samples use the declared name and keep the directory layout as a convention. Recommendation: declared, with a lint when the name and directory disagree.
+- **Import granularity.** Whole package (used here), or named symbols (`import runtime.Conn`). Whole package is simpler; symbol imports give the contract hashes in `.smod` a natural unit, and they are already per symbol there. Recommendation: whole package at the source level.
+- **Visibility.** What a package exports to others, and how encapsulated `sync` code (spec 7.2) is protected from being bypassed. Not specified yet.
+- **Nesting and names.** Whether `runtime.io` is a package nested in `runtime` or just a name. The samples treat names as flat.
+- **Versions.** The `.smod` carries the package version ([modules](modules.md)); how a source tree states which version of an imported package it expects.
+

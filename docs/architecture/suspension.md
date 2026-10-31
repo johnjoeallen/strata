@@ -21,7 +21,7 @@ A function's own body can park only through these, and the analysis starts from 
 2. Entering `sync`/`mutate` (it queues FIFO, see spec 7.1). The body of the block can never park, so a lock is never held across a suspension.
 3. A call to a function whose summary is `May`, or `Cond(P)` with a member of `P` bound to something that may park.
 4. A call through an interface or function value whose declared bound permits parking (see [dispatch](dispatch-and-ffi.md#interface-calls)).
-5. A **compiler-inserted budget check**, only in a function that asks for one with `[yield]`, directly or through a file-level default (section 1.1). The check sits on loop back-edges and recursive-call entries of that function's own body; when the budget is exhausted the task yields, which is an ordinary park point. Without `[yield]` the compiler inserts nothing.
+5. A **compiler-inserted budget check**, only in a function that asks for one with `[yield]`, on the function itself or through its type or package (section 1.1). The check sits on loop back-edges and recursive-call entries of that function's own body; when the budget is exhausted the task yields, which is an ordinary park point. Without `[yield]` the compiler inserts nothing.
 6. A call to a blocking foreign function that the runtime offloads (see [blocking FFI](dispatch-and-ffi.md#blocking-foreign-calls)).
 
 Cleanup methods are `Never` by rule (spec section 9). A cleanup that tries to call a `May` function is a compile error, which is already the behaviour for `sync`/`mutate` bodies.
@@ -55,12 +55,25 @@ Three attributes on a function (`fn[yield] name(...)`). Spellings are the author
 
 | Attribute | Budget checks | May wait on I/O or a lock | Meaning |
 |---|---|---|---|
-| none | none, unless the file says `[yield]` | inferred | The default: nothing inserted |
+| none | none, unless an enclosing type or package says `[yield]` | inferred | The default: nothing inserted |
 | `[yield]` | inserted in this function's own loops and recursion | inferred | "The compiler may yield for me here" |
-| `[noyield]` | none, even if the file says `[yield]` | inferred | Overrides a file-level default |
+| `[noyield]` | none, even if an enclosing type or package says `[yield]` | inferred | Overrides an enclosing default |
 | `[nopark]` | none | no | Assertion: any park source is a compile error. Implies `[noyield]` |
 
-- **File-level default.** A `[yield]` line at the top of a file (placeholder spelling) makes it the default for every function in the file. `[noyield]` or `[nopark]` on a function overrides it. A CPU-heavy module marks itself once and tags its hot, bounded helpers.
+- **Where an attribute can be written, and precedence.** The innermost level wins, and the same three attributes work at every level:
+
+  | Level | Written as | Applies to |
+  |---|---|---|
+  | Function | `fn[yield] parse()` | its own body |
+  | Type | `struct Parser[yield] { ... }` | the methods declared in it |
+  | Package | `package[yield] imaging`, in one file of the package | every function in the package |
+  | Default | nothing written | nothing inserted |
+
+  A CPU-heavy type marks itself once and tags its hot, bounded helpers `[noyield]`. A `[nopark]` type asserts that none of its methods can park; a method can still override it, and the override is then reported at the method. Files are not a level: a file is a layout accident.
+- **Package.** Every source file starts with `package name`; the files that share a name form one package, which compiles to one `.smod` named after it (placeholder syntax; the rules are in [D14](open-decisions.md#d14-packages-and-imports)). The package default is written on the package declaration, `package[yield] imaging`, in exactly one file of the package (by convention `package.stra`); every other file writes a plain `package imaging`, and an attribute there is an error. Source files therefore carry no conflicting settings.
+- **Resolved at definition.** The compiler resolves each function's effective attribute when it compiles the defining package, and the IR carries the resolved value. A generic instantiated in another package keeps the setting of the package that defined it; settings are never inherited by importers. The package default is part of the module's input hash: changing it recompiles the package and its effect changes ripple as usual.
+- **Tooling must show the effective setting and its source** (function, type or package) in hover, because it is no longer visible at the function itself. That is the cost of having levels.
+- **Spelling.** The attribute follows `fn` on a function and the name on a type, which differ; whether to unify them (`fn f[yield]`) is **Open**.
 - **Own body only.** `[yield]` does not make callees yield. It is shorthand for a `yield()` every N iterations of the function's own loops. Its callers become `May` by ordinary inference.
 - **The effect widens only if a check is inserted.** A `[yield]` function with no loop or recursion stays `Never`; tagging it causes no ripple.
 - **What a check is:** a counter decrement and a rarely taken branch. On exhaustion the task goes to the back of the run queue and resumes in its turn: a park point, so live values are spilled to a frame as for any park. A check is also a cancellation point, so a task in a `[yield]` loop can be cancelled (section 4).
@@ -89,7 +102,7 @@ Rejected, with the call chain in the message:
 - Entering another `sync`/`mutate`, unless that object is in the same head.
 - A call through an interface or function value whose declared bound is not `Never` (the default bound is `May`).
 
-Inside such a region a `[yield]` marking is ignored for the region's own loops: no check is inserted there, and a file-level `[yield]` does not apply.
+Inside such a region a `[yield]` marking is ignored for the region's own loops: no check is inserted there, and a type- or package-level `[yield]` does not apply.
 
 **Why a body may not park** (the rule is a design choice, not a technical limit; frames could hold a lock):
 
@@ -105,7 +118,7 @@ What it costs: no I/O under a lock (copy out, release, then act, as `Db.get` and
 
 A lint, not a proof. Termination is undecidable, so these are warnings and never errors.
 
-**Classification.** Each loop gets a class, and each function gets a `loops` class in its summary, composed over its callees by the same rules as nested loops:
+**Classification.** Each loop gets a class, and each function gets a `loops` class in its summary, composed over its callees by the same rules as nested loops. The class describes *uninterrupted* work: a loop whose body contains a park point (a call to any `May` function, a `[yield]` check, `yield()`, a lock entry) contributes `none`, because every iteration gives the scheduler a chance. `purgeExpired` in `stra/redis/db.stra` is the example: its outer loop yields, and the inner loop under the lock is bounded by a counter against a constant.
 
 | `loops` | Meaning |
 |---|---|
@@ -137,6 +150,8 @@ Calls through interfaces, function values and foreign code contribute nothing at
 Illustrative Strata source and C. Neither is compiler output.
 
 ```cpp
+package http
+
 // Opted in: the compiler inserts a budget check in this loop. May, yields only.
 fn[yield] parseHeaders(buf: u8[]&): Headers throws BadRequest {
     var h = Headers();
@@ -179,12 +194,20 @@ fn tight(cache: Ref<Cache>, r: Reader&) {
 }
 ```
 
-A file that starts with the file-level default:
+A type that opts in as a whole, and a package that sets the default for its files (`package.stra` is the one file that may carry package attributes):
 
 ```cpp
-[yield]                              // placeholder spelling: every function below defaults to [yield]
-fn render(page: Page&): string { for b in page.blocks { ... } }   // gets checks
-fn[noyield] crc(data: u8[]&): u32 { ... }                          // override: plain C
+// imaging/package.stra
+package[noyield] imaging         // the package default; here it restates that nothing is inserted
+
+// imaging/renderer.stra
+package imaging
+
+struct Renderer[yield] {
+    fn render(page: Page&): string { for b in page.blocks { ... } }   // gets checks: the type says [yield]
+    fn[noyield] crc(data: u8[]&): u32 { ... }                          // override: plain C
+    fn[nopark] width(c: u32): u32 { return c < 128 ? 1 : 2 }          // asserts it never parks
+}
 ```
 
 Inferred effects and summary fields:
@@ -291,15 +314,16 @@ Frames come from a per-function arena, sized exactly. This matches the existing 
 ### Pseudocode
 
 ```
-// module db (compiled separately)         Park(query) = May   (calls Conn.recv)
-fn query(sql: string&, id: i64) -> Row throws DbError {
+package db                                  // compiled separately         Park(query) = May   (calls Conn.recv)
+fn query(sql: string&, id: i64): Row throws DbError {
     let c = pool.acquire();                 // May: waits for a free connection
     c.send(encode(sql, id));                // May
     return decode(c.recv());                // May
 }
 
-// module app
-fn handle(req: Request&) -> Response throws DbError {
+package app
+import db
+fn handle(req: Request&): Response throws DbError {
     let row = db.query("select ...", req.id);   // inferred May; nothing written
     return render(row);                         // Never
 }

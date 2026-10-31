@@ -1,15 +1,12 @@
 // server.stra - the mini-redis server itself: the accept loop, the per-connection command loop, the subscribe loop, shutdown, main.
 // Everything else is in runtime/ and redis/. Original: server.rs, shutdown.rs, cmd/*.rs `apply`, cmd/subscribe.rs `apply`.
 // C counterpart (to write): server.c.
-import runtime.leaves
-import runtime.sync
-import redis.types
-import redis.limits
-import redis.connection
-import redis.reply
-import redis.command
-import redis.db
+package redis
+import runtime
 
+// Scheduling in this file: nothing is inserted by the compiler and no function needs [yield]. Every loop here either parks (waitAny, a
+// lock, yield()) or is bounded by a stated limit (PER_TURN, lim.maxSubs, the frame's item count), so the worker is released regularly.
+// The two explicit yield() calls below are the only places a connection gives up its turn without waiting for anything.
 const PER_TURN: usize = 64                               // commands one connection runs, or messages it delivers, before it yields; stated, not tuned
 
 // ---------- accept loop and shutdown ----------
@@ -115,7 +112,8 @@ struct Subscriptions {
     db: Db&
 
     // Runs when the loop ends by any route (return, exception). It never parks, so it cannot take the database lock (entering one parks):
-    // it hands each remaining subscription to the reaper queue, and the purge vthread unsubscribes it.
+    // it hands each remaining subscription to the reaper queue, and the purge vthread unsubscribes it. db.release is [nopark], so the compiler
+    // checks this; the loop is over `names`, at most lim.maxSubs entries (loops: long, so it appears only under --warn-loops=all).
     fn cleanup() { for (n in names) db.release(n, mailbox) }
 }
 
@@ -195,10 +193,10 @@ fn replySubscription(writer: Writer&, verb: string, name: u8[]&, count: usize) t
 fn main(args: string[]) {
     let lim = Limits.fromArgs(args)
     let port = args.getInt("port", 6379)
-    let db = Db.make(lim)                                                     // Ref<Db>: shared by every worker
+    let db = Db.make(lim)                                                     // fresh, so local here; published (shared) when the worker closures capture it below
     let shutdown = Flag.make()
     let live = Limiter.make(lim.maxConns)                                     // one limit for the whole server, not one per worker
-    onSignal(SIGINT, fn() noparks { shutdown.set() })
+    onSignal(SIGINT, fn[nopark]() { shutdown.set() })                         // a signal handler may not park: the compiler checks it
     spawnWorkers(args.getInt("workers", 1), fn(w: Worker) {
         let listener = Listener.bindReusePort(port)
         scope {

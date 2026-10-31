@@ -23,6 +23,8 @@ Status: **Direction**. Replaces the open questions about "how shareability is pr
 
 **R7. Borrows.** A borrow taken inside a block cannot leave it (return, store, capture). A `T&` parameter needs no block in the callee: the caller either owns the object locally or holds the block (R4 checks its mode against the callee's summary).
 
+**R8. Runtime types.** A type declared `extern` (Signal, Flag, Limiter, Mailbox, Wakeup) synchronises itself. Its methods need no block, whoever calls them and whether or not the object is shared; the `extern` declaration is a promise, as it is for parking. Only Strata-defined types follow R1 to R7.
+
 **Fresh results.** A function whose result is a new allocation that nothing else refers to is marked `fresh` in its summary, so `let db = Db.make(lim)` is local in the caller until it escapes. Without `fresh` the caller must treat the result as incoming.
 
 Mutability, escape (retains/publishes), access mode per parameter, and `fresh` are Tier A contract data ([modules](architecture/modules.md#access-and-escape-summaries)). Changing a field from write-once to mutable is a breaking change.
@@ -32,6 +34,8 @@ Mutability, escape (retains/publishes), access mode per parameter, and `fresh` a
 A test or a command-line tool builds a store and reads it back in one vthread. Nothing escapes, so there is nothing to lock.
 
 ```cpp
+package tools
+
 fn loadAndCount(path: string&): usize {
     let store = new Store {}              // local
     for line in readLines(path) {
@@ -46,6 +50,8 @@ Under the earlier `SharedRef` idea this would have needed a different type or a 
 ## Example 2: what `Db` needs and what it does not
 
 ```cpp
+package redis
+
 struct Db {                               // every field is set in make() and never written again: write-once
     store: Ref<Store>
     purgeWake: Signal
@@ -60,9 +66,12 @@ struct Db {                               // every field is set in make() and ne
         }
     }
 
-    fn maxKeys(): usize { return lim.maxKeys }   // lim is write-once: no block, even though db is incoming
+    fn[nopark] release(channel: u8[]&, mb: Ref<Mailbox<Message>>) {
+        reaper.tryPush(Reap { ... })      // reaper is write-once and Mailbox is an extern handle (R8): no block; [nopark] lets cleanup() call it
+    }
 }
 ```
+`stra/redis/db.stra` is written this way, with these notes in its header.
 
 - `db.store` and `db.lim` are read with no block, because those fields never change after `make`. This is why the existing code already writes `sync(store)` and not `sync(db)`.
 - `store.entries` is mutated by `set`, `purgeExpired` and others, so reads and writes of it go through `sync`/`mutate`.
@@ -71,12 +80,16 @@ struct Db {                               // every field is set in make() and ne
 ## Example 3: errors the compiler reports
 
 ```cpp
+package redis
+
 fn size(db: Db&): usize {
     return db.store.entries.count         // error: store.entries is mutable and db is incoming
 }                                         //   fix: sync(db.store) { return db.store.entries.count }
 ```
 
 ```cpp
+package redis
+
 fn trim(store: Ref<Store>) {
     sync(store) {
         store.entries.remove(oldest(store))   // error: entries.remove writes its receiver
@@ -85,6 +98,8 @@ fn trim(store: Ref<Store>) {
 ```
 
 ```cpp
+package redis
+
 fn peekKeys(store: Ref<Store>): Map<Bytes, Entry>& {
     sync(store) {
         return store.entries              // error: a borrow taken in a sync block cannot leave it
@@ -97,6 +112,8 @@ The messages name the chain and the fix. A missing block on a reference that tur
 ## Example 4: publishing, and what changes after it
 
 ```cpp
+package redis
+
 fn main(args: Args&) {
     let db = Db.make(lim)                 // fresh: local so far
     db.purgeWake.notify()                 // Signal is a runtime handle, not db's mutable state
@@ -111,6 +128,8 @@ Before the `spawn`, `db` is local and could be inspected directly. After it, eve
 ## Example 5: modes across a call
 
 ```cpp
+package redis
+
 fn expireAndCount(store: Ref<Store>): usize {
     mutate(store) {
         purgeBatch(store)                 // summary: purgeBatch writes param 0 -> mutate required: ok
@@ -160,5 +179,6 @@ Reference counts follow the same split. An object the compiler proves local uses
 - **Counts per instance.** A flag test in each count operation, or atomic always for non-local references. Needs `refcount_bench` on realistic access patterns.
 - **Write-once across modules.** A field is write-once if no code in its defining module writes it. Public fields that other modules may write need either a mutability declaration or a rule that they are mutable by default.
 - **Immutable types.** Inferred from R3 as above; whether to also let the programmer assert it (for a compile error if a later change breaks it) is undecided.
+- **Runtime types that are not thread-safe.** R8 treats every `extern` type as self-synchronising. Whether an `extern` declaration may say otherwise (a handle that one vthread must own) is undecided.
 - **Interfaces and function values.** A call through one needs a declared access mode per parameter, as it needs an effect bound. Default is "writes", the safe direction for the caller.
 - **Lint.** A value read in a `sync` block and used to decide a write in a separate `mutate` block on the same object (the get-then-put race of spec 7.2). A warning, not an error.

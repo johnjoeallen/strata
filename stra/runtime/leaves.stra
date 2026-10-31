@@ -6,6 +6,13 @@
 // An `extern` declaration has no body, so the compiler has nothing to analyse and cannot infer whether the function waits. That one fact
 // has to be stated, with the `parks` modifier; an extern function without it returns without waiting. Everywhere else the compiler infers
 // parking from the code, and tooling shows it, so it is never written.
+//
+// Scheduling: the compiler inserts no yields on its own. A function opts in with the attribute `[yield]` (or a type does, `struct Parser[yield]`; the innermost
+// level wins), and `yield()` below is the explicit call. `[nopark]` on a function or a function type asserts that it can never park; code in
+// a sync/mutate body, a cleanup() or a callback from C may call only functions that never park. A plain `extern fn` is a promise that the
+// call returns quickly without waiting; one that may block the thread would be declared `extern blocking` (run by a blocking pool).
+
+package runtime
 
 exception IoError                                        // a socket or file operation failed
 

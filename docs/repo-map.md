@@ -2,7 +2,7 @@
 
 ```
 strata-design.md     the design specification
-stra/                Strata source only
+stra/                Strata source only; every file starts with `package name` (runtime, http, redis, experiments)
   runtime/             runtime interface and the parts writable in Strata
   http/                HTTP library and server.stra; styles/{cpp,java,mixed}/server.stra are the same server in three syntax styles
   redis/               mini-redis library and server.stra

@@ -1,10 +1,7 @@
 // http/batching.stra - opt-in response batching for a sequential connection loop (off by default; superseded for most uses by the pipelined loop).
 // C counterpart: the BATCH_N blocks of handle_step (server.c).
-import runtime.leaves
-import runtime.io
-import http.types
-import http.config
-import http.reader
+package http
+import runtime
 
 // ---------- the alternative: opt-in response batching for a sequential loop (HTTP library feature, off by default) ----------
 // Superseded for most uses by 5b, which gets the same batching as a consequence of its structure. Kept because it needs no
@@ -54,9 +51,9 @@ struct BatchedWriter {
 
 // maxHold is only checked BETWEEN handlers and a running handler cannot be interrupted, so it cannot protect a batch from
 // one long handler; the route's `cost` declaration (section 2) does, by flushing before an unbounded route runs.
-// `noparks` is part of the handler's type: the function passed here must be one the compiler has shown can never park, so batching is allowed.
-// A handler that may park is not accepted.
-fn handleBatched(conn: Conn, handler: fn(u8[]&): Resp noparks, maxBatch: usize, cfg: ServerConfig&): Ending throws IoError, TooLarge {
+// `[nopark]` is part of the handler's type: the function passed here must be one the compiler has shown can never park, so batching is allowed.
+// A handler that may park, including one marked [yield], is not accepted.
+fn handleBatched(conn: Conn, handler: fn[nopark](u8[]&): Resp, maxBatch: usize, cfg: ServerConfig&): Ending throws IoError, TooLarge {
     var input = Reader.of(conn, cfg)
     var out = BatchedWriter.of(conn, maxBatch, 50us)
     while (true) {

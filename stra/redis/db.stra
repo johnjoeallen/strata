@@ -1,27 +1,31 @@
 // redis/db.stra - the shared database: key/value entries with optional expiry, and the channel table for pub/sub.
 // Original: db.rs (Arc<Mutex<State>> + a purge task + Notify + broadcast channels).
 // Differences, each deliberate:
-//   * values are shared as Ref<Value> (atomic count): get() copies the Ref out of sync(), so the reply is written AFTER the lock is released;
-//     a parking send never happens inside sync/mutate (that is a compile error).
+//   * values are shared as Ref<Value>. Sharing is not declared: a Value is published when it is stored into the store (or pushed to a mailbox),
+//     and Value has only write-once fields, so reading `v.bytes` needs no block anywhere. get() copies the Ref out of sync(), so the reply is
+//     written AFTER the lock is released; a parking send never happens inside sync/mutate (that is a compile error).
+//   * which accesses need a block (design doc 7.3): `Store` fields are mutable (insert, remove), so every access through `store` is inside
+//     sync/mutate. `Db` fields are written once, in make(), so reading `store`, `lim`, `closed` and the rest needs none. Signal, Flag and Mailbox
+//     are runtime handles that synchronise themselves, so `purgeWake.notify()` and `reaper.tryPush()` need none either.
 //   * entering sync/mutate PARKS the vthread while another worker holds the lock (design doc 7.1); the critical sections themselves never park
 //     and are bounded (purgeExpired removes at most PURGE_BATCH keys per hold). So every Db method that locks may park, and none can be called
 //     from cleanup(): a connection that ends hands its (channel, mailbox) pairs to release(), a non-parking push on the reaper queue, and the
 //     purge vthread, which may park, does the unsubscribing.
+package redis
+import runtime
+
 const PURGE_BATCH: usize = 1000                          // keys removed per lock hold: the stated bound on how long purgeExpired keeps the lock
 //   * maxKeys / maxValue / maxTopics are enforced; the original has no limit.
 //   * a topic with no subscribers is removed; the original keeps it forever.
 //   * a full subscriber queue refuses the message and counts it (runtime/sync.stra Mailbox); the original silently drops the oldest.
-import runtime.leaves
-import runtime.sync
-import redis.types
-import redis.limits
 
-struct Value { bytes: u8[] }                             // immutable once built
+struct Value { bytes: u8[] }                             // immutable once built: every field is write-once, so no block is ever needed to read it
 struct Message { channel: Ref<Value>, data: Ref<Value> }
 struct Entry { value: Ref<Value>, expiresAt: Instant? }
 struct Topic { name: Ref<Value>, subs: Ref<Mailbox<Message>>[] }
 
-// Everything one lock protects.
+// Everything one lock protects. Every field is mutable (written after construction), so every access to a Store that is not provably local
+// goes through sync (read) or mutate (write).
 struct Store {
     entries: Map<Bytes, Entry>
     expirations: OrderedSet<Expiry>                      // (when, key), earliest first
@@ -30,6 +34,7 @@ struct Store {
 struct Expiry { when: Instant, key: Bytes }
 struct Reap { channel: Bytes, mailbox: Ref<Mailbox<Message>> }   // a subscription whose connection has ended
 
+// Every field of Db is set in make() and never written again: write-once, so reading them takes no block.
 struct Db {
     store: Ref<Store>
     purgeWake: Signal                                    // set() tells the purge vthread that the earliest expiry may have moved
@@ -37,13 +42,13 @@ struct Db {
     reaper: Ref<Mailbox<Reap>>                           // sized maxConns * maxSubs, the most subscriptions that can exist, so a push cannot fail
     lim: Limits
 
-    static fn make(lim: Limits): Ref<Db> {
+    static fn make(lim: Limits): Ref<Db> {                // the result is fresh (a new allocation nothing else refers to), so a caller may treat it as local
         return new Db { store: new Store {}, purgeWake: Signal.make(), closed: Flag.make(),
                         reaper: Mailbox<Reap>.make(lim.maxConns * lim.maxSubs), lim: lim }
     }
 
     // For cleanup(): never parks, never locks. The purge vthread unsubscribes it shortly after.
-    fn release(channel: u8[]&, mb: Ref<Mailbox<Message>>) { reaper.tryPush(Reap { channel: Bytes.copyOf(channel), mailbox: mb }) }
+    fn[nopark] release(channel: u8[]&, mb: Ref<Mailbox<Message>>) { reaper.tryPush(Reap { channel: Bytes.copyOf(channel), mailbox: mb }) }
 
     fn get(key: u8[]&): Ref<Value>? {
         sync(store) {
@@ -78,6 +83,7 @@ struct Db {
         sync(store) {
             let t = store.topics.get(channel)
             if (t == null) return 0
+            // this loop is over the subscribers of one channel, at most lim.maxSubs per connection: loops: long, so it warns only under --warn-loops=all
             for (mb in t.subs) mb.tryPush(Message { channel: t.name, data: data })   // never parks; false = full, counted by the mailbox
             return t.subs.count
         }
@@ -113,7 +119,7 @@ struct Db {
             mutate(store) {
                 let now = Instant.now()
                 var n = 0
-                while (n < PURGE_BATCH) {
+                while (n < PURGE_BATCH) {                      // loops: bounded (a counter against a constant), so no warning under the lock
                     let first = store.expirations.first()
                     if (first == null) break
                     if (first.when > now) { next = first.when; break }
@@ -124,7 +130,7 @@ struct Db {
                 full = n == PURGE_BATCH
             }
             if (!full) return next
-            yield()
+            yield()                                          // explicit: the outer loop parks here, so it is not a loop that holds the worker
         }
     }
 

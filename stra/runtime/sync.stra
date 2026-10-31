@@ -3,8 +3,10 @@
 // where `parks` is written. The rest of the runtime (sockets, timers, scheduler) is runtime/leaves.stra, unchanged.
 // C counterpart (to write): runtime/rt_sync.h. A wake from another worker goes through that worker's wake queue (an eventfd the worker's
 // epoll already watches), so the woken vthread resumes on ITS worker, in that worker's turn; nothing migrates.
-import runtime.leaves
+package runtime
 
+// These types are `extern`: the runtime synchronises them itself, so calling their methods from any worker needs no sync/mutate block
+// (the design doc's rule that access to shared mutable state needs a block applies to Strata-defined types, not to these).
 // Signal, Flag and Limiter are HANDLES to a shared runtime object: copying one shares the object (atomic count), so a worker closure or the
 // signal handler can capture them. Mailbox is created as a Ref, for the same reason.
 

@@ -1,5 +1,5 @@
 // runtime/io.stra - sending. C counterpart: runtime/rt_io.h (write_all_step, WriteAll).
-import runtime.leaves
+package runtime
 
 // ---------- sending ----------
 // Sends all of `bytes`. A short send leaves the rest in the frame while the vthread waits for space.

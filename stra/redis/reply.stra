@@ -2,9 +2,8 @@
 // The same here, stated: bytes go into one pooled OutBuf, `flush()` sends them, and every command handler ends its reply with flush().
 // Nothing is held back across replies. The buffer is taken from the pool when a reply starts and returned when it is flushed, so an idle
 // connection owns none (design: no memory held while waiting).
-import runtime.leaves
-import runtime.io
-import redis.types
+package redis
+import runtime
 
 struct Writer {
     conn: Conn&

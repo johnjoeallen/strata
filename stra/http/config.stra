@@ -2,6 +2,8 @@
 // C counterpart: the command-line options parsed in server.c main() (maxhead= maxbody= uploadmax= tmpdir= yield= depth= linger= lingerbytes=).
 // Runtime configuration. The host passes it in; the language knows nothing about it. Defaults suit a typical API server, which should not
 // accept large bodies: the standard reader is capped at maxBody, and only a route that opts into the upload reader can receive more.
+package http
+
 struct ServerConfig {
     maxHead: usize = 16.kb         // largest accepted header block (431 beyond it)                                server.c: maxhead=
     maxBody: u64 = 1.mb            // the STANDARD reader's limit: an ordinary route never sees a larger body (413)  server.c: maxbody=

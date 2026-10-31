@@ -1,6 +1,6 @@
 # Compiled modules and application linking
 
-A **compiled Strata module** (working extension `.smod`; a bundle of them is an archive, `.sar`) is what a library ships and what an application consumes. It carries enough to type-check, lifetime-check, effect-check and optimise a program against it **without the original source**. Names and extensions are placeholders.
+A **compiled Strata module** (working extension `.smod`; a bundle of them is an archive, `.sar`) is the compiled form of one source *package* (the files that declare the same `package name`, see [D14](open-decisions.md#d14-packages-and-imports)); the module takes the package's name. It is what a library ships and what an application consumes. It carries enough to type-check, lifetime-check, effect-check and optimise a program against it **without the original source**. Names and extensions are placeholders.
 
 ## 1. Three tiers of information
 
@@ -204,14 +204,14 @@ Not a reason to recompile M: a change in an imported function's body that leaves
 ## 7. Cross-module propagation, example
 
 ```
-module net      export Conn.recv       Park=May   foreign=nonblocking    hash n1
+package net      export Conn.recv       Park=May   foreign=nonblocking    hash n1
                 export Conn.close      Park=Never                         hash n2
 
-module db       import net.Conn.recv@n1
+package db       import net.Conn.recv@n1
                 export query           Park=May (via net.Conn.recv)       hash d1
                 export escape          Park=Never                         hash d2
 
-module app      import db.query@d1, db.escape@d2
+package app      import db.query@d1, db.escape@d2
                 handle()   -> Park=May      (via db.query)   inferred; nothing written
                 render()   -> Park=Never
 ```
