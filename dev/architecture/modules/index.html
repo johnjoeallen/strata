@@ -1474,10 +1474,14 @@ native cache (optional, repeatable)
   park:    Never | May | Cond(P)
   throws:  set of exception types that can escape
   foreign: none | nonblocking | blocking          // reaches a foreign call (see dispatch page)
-  yields:  bool                                    // park=May only because of compiler-inserted budget checks; cannot wait on I/O or a lock
+  yields:  bool                                    // park=May only because of compiler-inserted budget checks ([yield]); cannot wait on I/O or a lock
+}
+advisory (not hashed into the contract) = {
+  loops:   none | bounded | long | unbounded       // loop and recursion class of f including its callees; feeds the loop warnings
 }
 invariants: cleanup methods are Never; foreign=blocking implies park=May
 </code></pre></div>
+<p><strong>The <code>loops</code> class is advisory.</strong> It records, for each exported function, the worst loop class among its own loops and those of its direct callees (nested loops compose; see <a href="../suspension/#13-loop-warnings">suspension 1.3</a>). It exists so a caller's lint can warn about <code>tight -&gt; parse -&gt; scanForever</code> when <code>scanForever</code> is in another module and its source is not available. It is stored in Tier A but kept out of the contract hash on purpose: loop structure changes often, and a change from <code>bounded</code> to <code>long</code> must not force every dependant to recompile. Consequences: a warning can lag until the caller's lint next reads the callee's current <code>.smod</code>, and <code>loops</code> is never used for code generation. Calls through interfaces, function values and foreign code are recorded as <code>unknown</code> contributions and not as a class.</p>
 <p><code>Cond(P)</code> is stored symbolically, so a downstream module can resolve it with its own arguments. A conditional effect through a type parameter (<code>T.compare</code> that might park) is stored as <code>Cond({T})</code> and resolved at instantiation.</p>
 <p>Summaries are <strong>inferred</strong>, then <strong>exported as part of the contract</strong>. The consequence, already noted for borrow origins in spec 5.1: changing an implementation can change the contract with no source signature change. The compiler reports it (<a href="#4-versioning-and-compatibility">versioning</a>).</p>
 <h3 id="access-and-escape-summaries">Access and escape summaries<a class="headerlink" href="#access-and-escape-summaries" title="Permanent link">&para;</a></h3>
@@ -1566,6 +1570,7 @@ per type field:                 mutability = write-once | mutable
 <li><strong>ABI version</strong>: the Level-0 rules in the table above. A different ABI means a rebuild, never a silent link.</li>
 <li><strong>Contract hash</strong>, per exported symbol: a hash of exactly its Tier A entry (and for generics and exposed bodies, the Tier B IR). It is the unit of compatibility.</li>
 <li><strong>Module interface hash</strong>: a hash of all contract hashes, for a fast check.</li>
+<li><strong>Advisory data</strong> (<code>loops</code>) is excluded from every hash above.</li>
 <li><strong>Compatibility rule (Direction):</strong> an implementation change that alters no contract hash is compatible. A change that narrows an effect (<code>May</code> to <code>Never</code>), reduces <code>throws</code>, or adds an export is <em>backward compatible</em>. A change that widens an effect (<code>Never</code> to <code>May</code>), adds to <code>throws</code>, changes layout or changes a borrow origin is <strong>breaking</strong>, whether or not the signature text changed.</li>
 <li><strong>Semantic version policy:</strong> breaking contract changes require a major version; the compiler can compare two versions of a module and print the contract diff (which symbols changed and which dimension). This answers spec 10.10 (API stability) at the tooling level; the policy itself is <a href="../open-decisions/#d4-representing-effects-in-public-interfaces">Open</a>.</li>
 </ul>
@@ -1648,7 +1653,7 @@ per type field:                 mutability = write-once | mutable
 <li><strong>A contract hash of any symbol M references.</strong> Granularity is the symbol, not the whole imported module: M is not rebuilt because an unused export of a dependency changed.</li>
 <li><strong>Compiler, runtime ABI, module ABI, C compiler or flag set</strong> (the cache key dimensions).</li>
 <li><strong>An inlined body, in optimised mode only:</strong> if M's cached link-time product inlined or fused a function from N, and that function's Tier B/C IR hash changed.</li>
-<li><strong>Build configuration that affects closed-world decisions:</strong> the set of open interfaces or the entry points. (Budget checks are language semantics and not a build setting, so they are not a dimension here; the experimental switch that disables them is stamped in the header and refused by normal builds.)</li>
+<li><strong>Build configuration that affects closed-world decisions:</strong> the set of open interfaces or the entry points. (Budget checks are chosen by <code>[yield]</code>/<code>[noyield]</code> in the source, so they are already in the source hash and in the effect summaries; there is no separate build setting to track. The lint level is not a dimension: warnings do not affect generated code.)</li>
 </ol>
 <p>Not a reason to recompile M: a change in an imported function's body that leaves its contract hash alone (in incremental mode); a change in an unreferenced export.</p>
 <p><strong>Ripple of effect changes (the main risk).</strong> If <code>net.Conn.send</code> becomes <code>May</code> where it was <code>Never</code>, every caller's contract and generated code change, and so does every caller's callers when their own summary widens. The ripple is bounded by the call graph, and stops wherever a <code>nopark</code> tag or an already-<code>May</code> function absorbs it. The module compile prints the contract diff so the cause is visible; this is the same visibility the ownership metadata already needs.</p>

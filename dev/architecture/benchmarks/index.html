@@ -1223,8 +1223,8 @@
 <tr>
 <td>B13</td>
 <td>Budget-check overhead</td>
-<td>Tight loops (hashing, parsing, copying, <code>brc</code>-style scans) with checks on, strip-mined, and tagged <code>nopark</code>; time to yield and fairness under a CPU-bound task</td>
-<td>Decides whether checks-by-default holds. Needs the experimental disable switch.</td>
+<td>Tight loops (hashing, parsing, copying, <code>brc</code>-style scans) as plain C, with <code>[yield]</code> checks, and with strip-mined checks; time to yield and fairness under a CPU-bound task</td>
+<td>The cost of opting in. Also decides whether default-on is ever worth revisiting.</td>
 </tr>
 <tr>
 <td>B12</td>

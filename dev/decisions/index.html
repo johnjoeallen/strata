@@ -1029,8 +1029,12 @@
 <td>No feature may depend on the implementation; stackful runtime kept as reference.</td>
 </tr>
 <tr>
-<td>Compiler inserts budget checks in loops and recursion unless the function is tagged <code>nopark</code></td>
-<td>Long CPU work cannot monopolise a worker or defy cancellation; <code>nopark</code> gives plain C where the author wants it. Overhead still to be measured.</td>
+<td>Compiler inserts budget checks only in functions marked <code>[yield]</code> (or in a file marked so); <code>[noyield]</code> overrides; <code>[nopark]</code> asserts no parking at all</td>
+<td>Principle 10: nothing is inserted unless the code says so. Loops add no effect by default, so looping helpers are usable under locks without tagging. The cost is that unmarked CPU-bound code can stall a worker, which warnings aim to find.</td>
+</tr>
+<tr>
+<td>Loop warnings are a lint with an advisory <code>loops</code> class in the module summary, off by default except unbounded loops in lock bodies</td>
+<td>Termination is undecidable; the class is kept out of the contract hash so loop changes never force rebuilds.</td>
 </tr>
 <tr>
 <td>One <code>Ref&lt;T&gt;</code>; sharing is inferred, not declared. <code>sync</code>/<code>mutate</code> required where the object is not provably local and the field is mutable; no-ops on unshared objects</td>
