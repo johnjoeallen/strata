@@ -1002,6 +1002,10 @@
 <td>No feature may depend on the implementation; stackful runtime kept as reference.</td>
 </tr>
 <tr>
+<td>Compiler inserts budget checks in loops and recursion unless the function is tagged <code>never</code></td>
+<td>Long CPU work cannot monopolise a worker or defy cancellation; <code>never</code> gives plain C where the author wants it. Overhead still to be measured.</td>
+</tr>
+<tr>
 <td>C stays the backend</td>
 <td>Under the module architecture too.</td>
 </tr>
