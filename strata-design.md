@@ -42,7 +42,7 @@ Strata explores retaining those ideas where useful while supporting:
       whether they are bounded before anything is held behind them.
     - The compiler may optimize freely only where behaviour is unobservable (see 4.4); it must preserve identity,
       destructor timing and ordering.
-    - **The one exception is parking.** A call that may wait looks like an ordinary blocking call: no `async`/`await`,
+    - **The one exception is parking.** Parking includes yielding at compiler-inserted budget checks in loops and recursion, unless the function is tagged `never`. A call that may wait looks like an ordinary blocking call: no `async`/`await`,
       no function colouring. The compiler infers which functions may park (the may-park effect) and sizes their
       frames. Because this is hidden by design, tooling must make it visible (hover, lints, and error messages that
       name the call chain), and parking inside `sync`/`mutate` is a compile error.
@@ -200,6 +200,7 @@ The **programming model** is virtual threads with stackful-like semantics: local
 - The compiler infers the **may-park effect** (principle 10) transitively over the call graph. A function that cannot park compiles to an ordinary C function. A function that may park is lowered to a state machine whose frame holds exactly the values live across its park points.
 - Preferred shape: a native-stack fast path, with frames created only while a real park unwinds, and the scheduler resuming the innermost frame directly. Eager and embedded frames are alternatives chosen per function. Frames never move.
 - No `async`/`await`: suspension capability propagates through the call graph without syntax at each level.
+- **Budget checks (decided):** the compiler inserts a cheap check on loop back-edges and recursive calls; when the budget runs out the task yields, and the check is also a cancellation point. A function tagged `never` gets no checks and may not park. Code in `sync`/`mutate` bodies, cleanups and C callbacks is implicitly `never`. Overhead is unmeasured (`docs/architecture/benchmarks.md`, B13).
 - Scheduling: an OS-thread worker pool of configurable size, nonblocking sockets plus `epoll` on Linux, scheduler-aware `read`, `write`, `accept`, timers and waits. Synchronization waits **park virtual threads**, not carrier threads. Task-local globals and arenas belong to the vthread. Start with thread-affine tasks; migration and work stealing come later.
 - Blocking native calls are explicit: a plain `extern fn` is a promise of a short, nonblocking call; a call that may block is declared as such and is run by the runtime on a blocking pool (`docs/architecture/dispatch-and-ffi.md`). A blocking call must never silently stall a worker.
 - Conservative contracts: calls through interfaces and function values compile against a declared effect bound (default may-park), so a later change of an implementation cannot make a compiled caller unsafe.
@@ -224,7 +225,7 @@ handler on a pinned worker is not helped. Measurements: `bench/results/http.md`.
 
 ### 6.4 Suspension effects at module boundaries
 
-*Direction.* Every exported function's contract includes `park: Never | May | Cond(P)`, its `throws` set and whether it reaches a blocking foreign call. The effect is inferred, exported, and checked at link time. Widening an effect (`Never` to `May`) is a breaking change even when the signature text is unchanged; tooling reports the contract diff. An optional assertion (placeholder: `noparks`) lets a library author turn an accidental widening into a compile error. Cancellation is delivered at park points as a non-catchable unwind that runs cleanups. Details: `docs/architecture/suspension.md` and `docs/architecture/modules.md`.
+*Direction.* Every exported function's contract includes `park: Never | May | Cond(P)`, its `throws` set and whether it reaches a blocking foreign call. The effect is inferred, exported, and checked at link time. Widening an effect (`Never` to `May`) is a breaking change even when the signature text is unchanged; tooling reports the contract diff. The `never` tag asserts a function never parks and suppresses budget checks; it turns an accidental widening into a compile error. Cancellation is delivered at park points as a non-catchable unwind that runs cleanups. Details: `docs/architecture/suspension.md` and `docs/architecture/modules.md`.
 
 ## 7. Shared state and synchronization
 

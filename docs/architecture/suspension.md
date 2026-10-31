@@ -21,7 +21,7 @@ A function's own body can park only through these, and the analysis starts from 
 2. Entering `sync`/`mutate` (it queues FIFO, see spec 7.1). The body of the block can never park, so a lock is never held across a suspension.
 3. A call to a function whose summary is `May`, or `Cond(P)` with a member of `P` bound to something that may park.
 4. A call through an interface or function value whose declared bound permits parking (see [dispatch](dispatch-and-ffi.md#interface-calls)).
-5. A compiler-inserted scheduling check, if the build enables budgeted preemption (see the discussion in `ASSESSMENT.md`). This makes more functions `May`, so it is a build setting, not a default.
+5. A **compiler-inserted budget check** (Decided by the author; mechanism Direction). Every loop back-edge and every recursive call entry in a function not tagged `never` carries a check: decrement a per-worker budget, and when it is exhausted the task yields, which is an ordinary park point. This makes every function that contains a loop or recursion `May`, unless it is tagged `never`. See section 1.1.
 6. A call to a blocking foreign function that the runtime offloads (see [blocking FFI](dispatch-and-ffi.md#blocking-foreign-calls)).
 
 Cleanup methods are `Never` by rule (spec section 9). A cleanup that tries to call a `May` function is a compile error, which is already the behaviour for `sync`/`mutate` bodies.
@@ -47,7 +47,19 @@ Across modules the same computation runs on summaries (a few words per function)
 
 - **No colouring in source.** Nothing is written to opt in or out of parking. This is the one exception to principle 10 ("no hidden behaviour"), and it is unchanged.
 - **Visibility is tooling's job** (Decided, principle 10): hover, lints and errors that name the chain `handle -> loadUser -> pool.acquire -> Conn.recv`.
-- **An optional assertion** (**Open**, see [open decisions D4](open-decisions.md#d4-representing-effects-in-public-interfaces)). A public function can be asserted `noparks`; the compiler then rejects any change that makes it park. This is not a colour (it is never required, and callers need not mention it); it only turns a silent effect change into a compile error at the library boundary. Syntax is a placeholder.
+- **The `never` tag** (Decided as the opt-out; spelling a placeholder, see [D4](open-decisions.md#d4-representing-effects-in-public-interfaces)). A function written `never fn ...` is asserted `Never`: no budget checks are inserted in it, and the compiler rejects any park source in its body, including a call to a `May` function. It is not a colour: callers do not mention it and it is never required. It is the way to get plain C for a hot loop, and it turns a silent effect change into a compile error at a library boundary.
+
+### 1.1 Budget checks and the `never` tag
+
+The default is that code can be interrupted; opting out is explicit.
+
+- **Where checks go:** loop back-edges and recursive-call entries, not every function entry. A function with neither (straight-line code calling only `Never` functions) is inferred `Never` with no tag.
+- **What a check is:** a counter decrement and a rarely taken branch. When the budget runs out the task yields to the back of the run queue and resumes in its turn: a park point, so the live values are spilled to a frame exactly as for any park. Checks are also cancellation points, so a task in a long loop can be cancelled (`CANCELLED` wake, see section 4).
+- **Cost control (Direction):** strip-mine loops so the counter is tested once per block of iterations, not every iteration; omit the check for loops with a small constant bound. Neither is guaranteed; the overhead on tight loops must be measured (benchmarks B13).
+- **Regions where a check is a park and so forbidden:** the body of `sync`/`mutate`, cleanup methods, and callbacks entered from C. Code there is implicitly `never`, so a function called from them must be inferred or tagged `never`. Library functions likely to be used there (copying, hashing, sorting a small array, formatting) are the library author's to tag.
+- **Consequence for the effect lattice:** most application functions that loop are now `May`, so the `May` path is the common one and the per-call status test (about 0.7 to 1.5 ns, hand-written C, toy) applies broadly. The `yields` bit in the summary distinguishes "`May` only because of budget checks" from "can wait on I/O or a lock"; such a function never blocks on anything external.
+- **Not a build option:** checks are language semantics, so effect summaries are the same for every build and modules from different builds can be mixed. An experimental switch to disable checks exists only to measure their cost and stamps the module header; such modules do not link into a normal build.
+- **Limits that remain:** the budget bounds how long a *checked* region runs, not how long a `never` function, a plain `extern fn`, or a single indivisible library operation runs. A `never` function that loops without bound still stalls its worker, and that is now the author's explicit decision (tooling should warn on an unbounded loop in a `never` function).
 
 ## 2. Lowering to resumable frames
 
@@ -174,7 +186,7 @@ Case 2 is mechanical. Case 1 is not: `let buf = readBuffer(); conn.recv(buf&)` i
 
 ## 3. Calls that never suspend
 
-The common request has many `Never` helpers (parsing, rendering, hashing). They compile to ordinary C, and are inlined by the C compiler under its usual rules. A `Cond(P)` function called with a known non-parking argument binds to its plain entry. A `May` function called only from other functions that statically cannot reach its park sources cannot exist, since then it would have been `Never`.
+`Never` functions compile to ordinary C and are inlined by the C compiler under its usual rules. With budget checks on by default, a `Never` function is one that has no loop or recursion and calls only `Never` functions, or one tagged `never`. Parsing, rendering and hashing helpers that loop are `May` unless tagged, and the hot, bounded ones should be tagged. A `Cond(P)` function called with a known non-parking argument binds to its plain entry.
 
 For a `May` function the non-suspending path should be straight-line C with one status test after each `May` call. The cost of that test is what the 0.7 to 1.5 ns above measures.
 
@@ -192,7 +204,7 @@ Cooperative, as in spec 6.2: the cancelling party marks the task and wakes it. A
 
 Cancellation is **not an ordinary exception**: it is not named in `throws`, and `catch` cannot swallow it. Letting `catch (Exception)` swallow it would make cancellation unreliable; requiring it in `throws` would put the effect back in signatures everywhere. This choice interacts with the open exception-model question (spec 10.7) and is stated here as Direction only.
 
-A task that never parks cannot be cancelled. That is the same limitation as today's cooperative scheduler and is the reason to keep the budgeted-check option open.
+A task can be cancelled at any park point, including a budget check, so a task spinning in a checked loop is cancellable. A task inside a `never` function, a plain `extern fn` or an indivisible library operation is not, until it returns.
 
 ### Deterministic cleanup
 

@@ -9,7 +9,7 @@
 - How does a throw interact with a scope that still has child vthreads?
 - Stack model: fixed reserve with guard pages, or segmented stacks.
 - How are exported lifetime and effect metadata versioned? Direction in [architecture](architecture/modules.md); policy open.
-- Architecture decisions D1 to D13 (where lowering happens, borrowed locals with lazy frames, minimum IR, effects in public interfaces, fusion across modules, debugging maps, dynamic loading, blocking FFI): [open decisions](architecture/open-decisions.md).
+- Architecture decisions D1 to D13 (where lowering happens, borrowed locals with lazy frames, minimum IR, effects in public interfaces, fusion across modules, debugging maps, dynamic loading, blocking FFI, budget-check overhead): [open decisions](architecture/open-decisions.md).
 
 ## Not yet built or measured
 

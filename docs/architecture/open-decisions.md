@@ -30,7 +30,7 @@ Recommendation: ship (b) by default as Tier B plus a size-limited Tier C, with t
 
 Alternatives: (a) infer everything and export it (current plan); (b) require the author to declare the effect of public functions; (c) infer, and let the author optionally assert a bound.
 
-(b) reintroduces colouring. (a) alone lets an implementation change ripple silently through dependants. Recommendation: (c) - an optional `noparks` assertion (placeholder syntax), plus tooling that prints the contract diff between versions, and a version policy that treats widening as breaking. Open: spelling of the assertion, and whether to allow `parks` on non-extern functions as a "may park" promise for stability.
+(b) reintroduces colouring. (a) alone lets an implementation change ripple silently through dependants. Recommendation: (c) - an optional `never` tag (the opt-out from budget checks, see [suspension 1.1](suspension.md#11-budget-checks-and-the-never-tag)), plus tooling that prints the contract diff between versions, and a version policy that treats widening as breaking. Open: whether `never` is a modifier like `parks` (`never fn f()`) or an attribute, and whether to allow `parks` on non-extern functions as a "may park" promise for stability.
 
 ## D5. Recursion and dynamic dispatch
 
@@ -70,4 +70,12 @@ Recommended: not in `throws`, not catchable, runs cleanups. Alternative: a catch
 
 ## D13. Runaway non-parking code
 
-Without preemption, a function that neither parks nor ends stalls its worker and cannot be cancelled. Compiler-inserted checks (see `ASSESSMENT.md`) widen every effect that contains a loop. Recommendation: not in the first compiler; if added, a build setting recorded in module headers and in the cache key.
+**Decided by the author:** the compiler inserts budget checks in loops and recursion unless the function is tagged `never`. Mechanism in [suspension 1.1](suspension.md#11-budget-checks-and-the-never-tag).
+
+Still open:
+
+- **Overhead on tight loops.** Unmeasured. Strip-mining and small-constant-bound elision are expected to keep it low; the number decides whether this stays the default. Benchmark B13.
+- **Budget unit and source.** An iteration counter (cheap, not time) against a timestamp (time, but needs a clock read or a flag set from another thread). Recommendation: counter, with the budget sized in iterations per check block, and a watchdog flag as a later addition for fairness across long checked regions.
+- **Ripple.** Most looping code becomes `May`. Library functions used inside `sync`/`mutate`, cleanups and C callbacks must be `never`; the standard library needs a deliberate pass. Recommendation: standard-library collections, copying, formatting and hashing are tagged `never` where their cost is bounded by a declared limit.
+- **Where the check can be wrong.** Unbounded `never` loops, plain `extern fn`, and large indivisible library operations still stall a worker. Recommendation: a lint on unbounded loops in `never` functions, and a watchdog diagnostic for workers that make no progress.
+- **Interaction with fusion and the lazy shape.** A check is a park point inside a loop, so the loop's live values must be spillable; a loop with borrowed locals falls under [D2](#d2-borrowed-locals-and-the-lazy-shape) too.

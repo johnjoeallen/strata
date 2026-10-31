@@ -6,8 +6,8 @@ Rule for everything on this page: **a call whose target cannot be fixed at compi
 
 An interface method has a declared **effect bound**: the widest effect any implementation may have.
 
-- **Default bound: `May`** (Direction). Safe, and cheap because a `May` call that does not park costs about a call plus a status test (Measured, toy). A bound is written only when the author wants to narrow it, using the same optional `noparks` assertion as for functions (placeholder syntax; [D4](open-decisions.md#d4-representing-effects-in-public-interfaces)).
-- **Implementations are checked against the bound** when they are compiled. An implementation can be narrower than the bound, never wider. An implementation of a `noparks` method that calls a `May` function is a compile error in the implementing module.
+- **Default bound: `May`** (Direction). Safe, and cheap because a `May` call that does not park costs about a call plus a status test (Measured, toy). A bound is written only when the author wants to narrow it, using the same `never` tag as for functions (placeholder syntax; [D4](open-decisions.md#d4-representing-effects-in-public-interfaces)).
+- **Implementations are checked against the bound** when they are compiled. An implementation can be narrower than the bound, never wider. An implementation of a `never` method that calls a `May` function is a compile error in the implementing module.
 - **Callers** compile the call against the bound. A caller of a `May`-bound method uses the suspendable form regardless of the implementation.
 - **Vtable entries** for `May` methods hold the `f_call`/`f_resume` pair. An implementation that is `Never` registers a thunk that returns `DONE`, so the calling code is the same.
 - **At link time**, if the closed-world call graph shows one reachable implementation, the call may be devirtualised and the thunk and the status test removed. If several implementations exist, the bound still holds; any narrowing is an optimisation of the call site (a switch over known targets), never a change of contract.
@@ -68,7 +68,7 @@ Recommendation: 1 where available, 2 as the default for anything declared `exter
 
 C code calls a Strata function (a `qsort` comparator, a library event callback). The callback runs on whatever native stack C is using.
 
-- **Default (Direction):** a callback is compiled as `Never`. Calling a `May` function from it is a compile error. Because a callback is invoked from C, it is `f_call`-only: nothing underneath it can be captured.
+- **Default (Direction):** a callback is compiled as `Never` (implicitly `never`, so no budget checks). Calling a `May` function from it is a compile error. Because a callback is invoked from C, it is `f_call`-only: nothing underneath it can be captured.
 - **Exception: callbacks that must park.** Declared as parking callbacks, they run on a **blocking-pool thread only**, under a **synchronous driver**: the wrapper calls `f_call`; on `PARKED` it blocks the OS thread on a wake-up object, and on the wake calls `f_resume` until `DONE`. Parking then blocks that thread, not a scheduler worker. This is the `block_on` of Strata. It is forbidden on scheduler workers (compile error if the call is made from a worker context that is not a pool thread; at minimum, a runtime check).
 - Exceptions cannot cross a C frame. The wrapper catches `THROWN` and converts it to the library's error convention or aborts. The binding says which.
 

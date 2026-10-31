@@ -57,7 +57,7 @@ Summary(f) = {
   park:    Never | May | Cond(P)
   throws:  set of exception types that can escape
   foreign: none | nonblocking | blocking          // reaches a foreign call (see dispatch page)
-  yields:  bool                                    // contains compiler-inserted scheduling checks
+  yields:  bool                                    // park=May only because of compiler-inserted budget checks; cannot wait on I/O or a lock
 }
 invariants: cleanup methods are Never; foreign=blocking implies park=May
 ```
@@ -176,11 +176,11 @@ Recompile module M when any of these changes:
 2. **A contract hash of any symbol M references.** Granularity is the symbol, not the whole imported module: M is not rebuilt because an unused export of a dependency changed.
 3. **Compiler, runtime ABI, module ABI, C compiler or flag set** (the cache key dimensions).
 4. **An inlined body, in optimised mode only:** if M's cached link-time product inlined or fused a function from N, and that function's Tier B/C IR hash changed.
-5. **Build configuration that affects closed-world decisions:** the set of open interfaces, the entry points, or preemption-check mode (it changes effect summaries).
+5. **Build configuration that affects closed-world decisions:** the set of open interfaces or the entry points. (Budget checks are language semantics and not a build setting, so they are not a dimension here; the experimental switch that disables them is stamped in the header and refused by normal builds.)
 
 Not a reason to recompile M: a change in an imported function's body that leaves its contract hash alone (in incremental mode); a change in an unreferenced export.
 
-**Ripple of effect changes (the main risk).** If `net.Conn.send` becomes `May` where it was `Never`, every caller's contract and generated code change, and so does every caller's callers when their own summary widens. The ripple is bounded by the call graph, and stops wherever a `noparks` assertion or an already-`May` function absorbs it. The module compile prints the contract diff so the cause is visible; this is the same visibility the ownership metadata already needs.
+**Ripple of effect changes (the main risk).** If `net.Conn.send` becomes `May` where it was `Never`, every caller's contract and generated code change, and so does every caller's callers when their own summary widens. The ripple is bounded by the call graph, and stops wherever a `never` tag or an already-`May` function absorbs it. The module compile prints the contract diff so the cause is visible; this is the same visibility the ownership metadata already needs.
 
 ## 7. Cross-module propagation, example
 

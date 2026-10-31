@@ -224,6 +224,8 @@ Tokio. Go provides stronger automatic protection against that particular mistake
 
 ### Compiler-inserted scheduling checks are feasible, with important consequences
 
+*Update:* the author has decided to make these checks the default, with a `never` tag as the opt-out ([suspension 1.1](docs/architecture/suspension.md#11-budget-checks-and-the-never-tag)). The consequences below now describe the chosen design, not an option.
+
 A compiler could insert checks on loop back-edges and selected function entries,
 then yield when a scheduling budget expires. This would cover ordinary loops and
 recursion without requiring a programmer-written call at every point.
@@ -317,7 +319,7 @@ This distinction changes the difficulty of preemption too. With established
 stackful switching, suspending a call chain can reuse that mechanism. With
 resumable frames, the compiler must preserve each affected call chain and resume
 location, including newly introduced scheduling checks. The update records this
-as an open item ([D13](docs/architecture/open-decisions.md#d13-runaway-non-parking-code)).
+as a decision: compiler-inserted budget checks in loops and recursion by default, with a `never` tag as the opt-out. The overhead, and the effect ripple (most looping code becomes may-park), are unmeasured ([D13](docs/architecture/open-decisions.md#d13-runaway-non-parking-code)).
 
 ### Risks introduced or sharpened by the module architecture
 
