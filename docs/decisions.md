@@ -19,4 +19,7 @@ Rules the design has settled on, with the reason each was chosen.
 | Strata identifiers are camelCase | User preference. Constants stay UPPER_CASE; generated C may use underscores. |
 | Syntax: `T?`, methods in types, optional `self`, `Pattern -> {}` arms | Avoids Rust-isms. |
 | No third-party crates in converted programs | Strata would have no equivalents. |
+| Performance goal: same class as Rust async and Java vthreads, with a simpler model | Superiority is not claimed; ceremony is measured alongside speed. |
+| Programming model (vthreads) is separate from implementation (resumable frames) | No feature may depend on the implementation; stackful runtime kept as reference. |
+| C stays the backend | Under the module architecture too. |
 | Strata source and C live in separate folders | `stra/` is Strata only; `c/` is runtime and compiler-output stand-ins. |

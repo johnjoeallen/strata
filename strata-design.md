@@ -172,6 +172,8 @@ return origins: parameter 0 | parameter 1
 
 Such metadata is a **compile-time dependency**. The executable need not contain it. Changing an inferred contract may be an API compatibility change even when the source signature stays the same.
 
+The contract also records each function's **effect summary** (may-park, `throws`, foreign blocking) and is carried in a compiled module format with retained IR, so that downstream modules and the application link can be checked and optimised without the original source. See section 14 and `docs/architecture/modules.md`.
+
 ### 5.2 C interoperability
 
 C declarations contain no trustworthy ownership or lifetime semantics. Bindings must supply explicit contracts for returned or retained pointers, transferred ownership, deallocation, and invalidation; otherwise pointer-based FFI operations are unsafe. A wrapper can make a copy or acquire ownership when the C API's documented guarantee permits it. Strata must not infer guarantees from an opaque C function body it cannot inspect.
@@ -189,16 +191,22 @@ fn serve(listener: Listener&) {
 }
 ```
 
-### 6.1 Initial runtime approach
+The **programming model** is virtual threads with stackful-like semantics: locals live across a wait, `try` and cleanup span it, a cancelled task unwinds. The **implementation model** is separate (6.1). No language feature may depend on which implementation is used.
 
-- Stackful fibers, with independently managed execution stacks.
-- Cooperative scheduling initially, followed by an OS-thread worker pool.
-- Nonblocking sockets plus `epoll` on Linux, with scheduler-aware wrappers for `read`, `write`, `accept`, timers and waits.
-- Synchronization waits **park virtual threads**, not carrier OS threads.
-- Task-local globals and task arenas belong to the logical virtual thread, not the OS worker.
-- Start with thread-affine fibers; cross-carrier migration/work stealing is a later feature requiring FFI/TLS audits.
+### 6.1 Implementation: compiler-generated resumable frames
 
-Direct blocking C calls may pin or block the OS worker unless executed through adapted wrappers or a designated blocking pool. Stackful switching needs ABI-correct register handling, guard pages, safe suspension points and a defined cancellation protocol.
+*Direction; supersedes the earlier stackful-fiber plan. Rationale, lowering and limits: `docs/architecture/suspension.md`.*
+
+- The compiler infers the **may-park effect** (principle 10) transitively over the call graph. A function that cannot park compiles to an ordinary C function. A function that may park is lowered to a state machine whose frame holds exactly the values live across its park points.
+- Preferred shape: a native-stack fast path, with frames created only while a real park unwinds, and the scheduler resuming the innermost frame directly. Eager and embedded frames are alternatives chosen per function. Frames never move.
+- No `async`/`await`: suspension capability propagates through the call graph without syntax at each level.
+- Scheduling: an OS-thread worker pool of configurable size, nonblocking sockets plus `epoll` on Linux, scheduler-aware `read`, `write`, `accept`, timers and waits. Synchronization waits **park virtual threads**, not carrier threads. Task-local globals and arenas belong to the vthread. Start with thread-affine tasks; migration and work stealing come later.
+- Blocking native calls are explicit: a plain `extern fn` is a promise of a short, nonblocking call; a call that may block is declared as such and is run by the runtime on a blocking pool (`docs/architecture/dispatch-and-ffi.md`). A blocking call must never silently stall a worker.
+- Conservative contracts: calls through interfaces and function values compile against a declared effect bound (default may-park), so a later change of an implementation cannot make a compiled caller unsafe.
+- The earlier **stackful fibers** (independently managed stacks, guard pages, ABI-correct switching) remain as the reference implementation, as the memory baseline, and as the synchronous driver for foreign callbacks on pool threads.
+- Measured so far (hand-written C only, not compiler output): an idle parked task is about 137 B with no state against a 4 KB stackful floor; a parked call costs about 1 ns beyond an ordinary call; waking the innermost frame stays flat with depth. No performance superiority over Java virtual threads or Rust async is claimed; the evaluation plan is `docs/architecture/benchmarks.md`.
+
+Relative to Java virtual threads: no stack copying, no JVM, exact frames; but foreign frames cannot be suspended, dynamic code is harder, and stack traces need maps. Relative to Rust async: no `async` colouring, no `Pin`, uniform dynamic dispatch; but suspension is invisible in source (tooling must show it) and the compiler carries more analysis.
 
 ### 6.2 Scope and lifetime
 
@@ -213,6 +221,10 @@ prefix of responses in request order (RFC 7230 6.3.2). This makes response batch
 response waits only behind an unfinished earlier one) instead of a library hold with timers. Non-safe requests and
 routes declared unbounded act as barriers; depth is bounded. It overlaps handlers only where they park: a CPU-bound
 handler on a pinned worker is not helped. Measurements: `bench/results/http.md`.
+
+### 6.4 Suspension effects at module boundaries
+
+*Direction.* Every exported function's contract includes `park: Never | May | Cond(P)`, its `throws` set and whether it reaches a blocking foreign call. The effect is inferred, exported, and checked at link time. Widening an effect (`Never` to `May`) is a breaking change even when the signature text is unchanged; tooling reports the contract diff. An optional assertion (placeholder: `noparks`) lets a library author turn an accidental widening into a compile error. Cancellation is delivered at park points as a non-catchable unwind that runs cleanups. Details: `docs/architecture/suspension.md` and `docs/architecture/modules.md`.
 
 ## 7. Shared state and synchronization
 
@@ -335,9 +347,10 @@ Dedicated virtual reservations, as in Goose, remain the candidate for large in-m
    a parameter and to refer to the value itself); tagged enums with an exhaustive `switch` whose arms are `Pattern -> { ... }` (no `case` keyword, no fallthrough, commas to list several
    values, `default` required for non-enum switches; ranges, guards, bindings and destructuring deferred) (`enum Cost { Bounded(Duration) Unbounded }`);
    `let`/`var`; camelCase function names.
-8. **Virtual-thread stacks:** Fixed reserve with guard pages versus segmented/growable stacks; native-code suspension and migration limits.
+8. **Virtual-thread stacks:** Largely superseded by 6.1 (resumable frames). Remains for the stackful baseline and for fast-path native-stack depth in recursive functions. Related open items (lazy frames with borrowed locals, FFI, fusion): `docs/architecture/open-decisions.md`.
 9. **Synchronized callbacks and escaping values:** How to handle callbacks, function pointers, composite references and nested transactions safely.
-10. **API stability:** How to version exported inferred lifetime/effect metadata and diagnose breaking changes.
+10. **API stability:** Direction: contract hashes per symbol, format/ABI versions, contract diffs and a rule that widening an effect is breaking (`docs/architecture/modules.md`). Open: the enforcement policy and the spelling of the optional effect assertion.
+11. **Compilation architecture:** where continuation lowering happens, the minimum IR for cross-module optimisation, fusion across modules, debugging maps, dynamic loading (`docs/architecture/open-decisions.md`, D1 to D13).
 
 ## 11. Suggested implementation sequence
 
@@ -359,15 +372,15 @@ Implement `sync` and `mutate`, a scheduler-compatible reader/writer admission qu
 
 ### Phase 4 — Virtual-thread runtime
 
-Implement stackful execution, cooperative scheduler, timers, `epoll`-based I/O and a bounded native carrier-thread pool. Add cancellation and structured cleanup. Benchmark tens of thousands of mostly idle connections.
+Implement the cooperative scheduler, timers, `epoll`-based I/O and a bounded native carrier-thread pool, with tasks as sized resumable frames (hand-written C stands in for compiler output until Phase 5). Keep the stackful runtime as a reference for behavioural tests. Add cancellation and structured cleanup. Benchmark tens of thousands of mostly idle connections.
 
 ### Phase 5 — Library interfaces and FFI
 
-Export inferred lifetime/effect contracts at compilation. Support separately compiled libraries and safe C-binding wrappers with explicit contracts.
+Export inferred lifetime/effect contracts at compilation, in the module format of section 14. Support separately compiled libraries and safe C-binding wrappers with explicit contracts. Order: typed IR; local effect inference; Level-0 lowering to C per module; module files with Tier A contracts; incremental builds; only then retained IR and optimised application compilation (inlining, devirtualisation, fusion), each justified by a measurement.
 
 ### Phase 6 — Real application validation
 
-Build an HTTP service with dynamic request objects, a shared cache and file/socket lifetimes. Measure latency, throughput, peak resident memory, virtual memory consumption, contention and allocator behaviour against a comparable Rust/Tokio or Java virtual-thread implementation.
+Build an HTTP service with dynamic request objects, a shared cache and file/socket lifetimes. Measure latency, throughput, peak resident memory, virtual memory consumption, contention and allocator behaviour against a comparable Rust/Tokio or Java virtual-thread implementation, following `docs/architecture/benchmarks.md`: the target is the same performance class with less source ceremony, not superiority.
 
 ## 12. Success criteria
 
@@ -379,6 +392,7 @@ Strata should demonstrate that an ordinary concurrent server can be written with
 - Compiler-enforced, encapsulated synchronization.
 - Scalable logical tasks with straightforward blocking-style I/O.
 - Predictable resource cleanup and measured memory overhead.
+- Performance in the same class as hand-tuned Rust async or Java virtual-thread code, with less source ceremony. Superiority is not a goal and is not claimed without evidence.
 
 Strata remains an independent language regardless of the compiler implementation chosen. Reuse Goose-inspired virtual-memory techniques only where benchmarking and simplicity justify them.
 
@@ -388,6 +402,26 @@ Strata remains an independent language regardless of the compiler implementation
 - **Proposed command:** `strata`
 - **Proposed source extension:** `.stra`
 - **Suggested repository name:** `strata-lang` (availability not verified)
-- **Suggested compiler backend for initial prototype:** generated C; not a permanent ABI commitment.
+- **Suggested compiler backend for initial prototype:** generated C; not a permanent ABI commitment. C remains the native code-generation backend under the module architecture of section 14.
+- **Compiled module extension (placeholder):** `.smod`; bundle `.sar`.
 
 The name and syntax are working choices. No availability, trademark or namespace clearance has been completed.
+
+## 14. Compilation architecture
+
+*Direction. Full text: `docs/architecture/`. This section is a summary and the specification binds only what is marked Decided there.*
+
+```text
+Strata source -> parse/semantic analysis -> typed Strata IR
+   -> compiled module (.smod): contract + retained IR + effect summaries + call graph + optional native cache
+   -> application link: module resolution, cross-module effect and lifetime checks,
+      [optimised mode] devirtualise, inline, fuse frames
+   -> continuation lowering -> generated C -> C compiler and linker -> executable
+```
+
+1. **Module contents come in tiers.** Tier A (contract) is required for correctness; Tier B (generic and exposed bodies) for instantiation; Tier C (the rest of the IR, call-graph edges, park-point tables) only for optimisation. A program links correctly with Tier A and the Level-0 ABI alone.
+2. **Level-0 ABI** is the stable boundary: calling convention, `DONE/THROWN/PARKED` status, the frame header, vtable layout, exported type layout. A function's frame *body* is private, so changing it never breaks callers.
+3. **Two build modes.** Incremental: each module compiled and lowered independently against imported contracts; unchanged contract hashes stop the rebuild. Optimised: whole-application analysis over retained IR; re-lowers only chains it changes.
+4. **Recompilation** is triggered by the module's own change, a changed contract hash of a symbol it uses, a compiler/ABI/flag change, or (optimised mode) a changed inlined body.
+5. **Calls that cannot be resolved** (interfaces, function values, generics across modules, foreign code, loaded modules) compile against declared bounds, never against current implementations.
+6. **Performance goal:** excellent, not superior; the programming model is the point.

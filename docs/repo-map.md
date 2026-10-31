@@ -15,7 +15,7 @@ bench/
   c/ rust/ go/ java/   micro-benchmarks and comparators
   results/             recorded measurements
 tools/               strata2html.py, camel.py
-docs/                this site
+docs/                this site; docs/architecture/ holds compilation, suspension and module design
 ```
 
 Run a server's tests with `cd bench/http && ./build.sh && ./run_tests.sh`, and the same in `bench/redis`.

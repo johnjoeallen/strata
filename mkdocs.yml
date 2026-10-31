@@ -37,6 +37,14 @@ nav:
       - 4. Against Rust and Go: journey/04-comparison.md
       - 5. mini-redis: journey/05-mini-redis.md
       - 6. Locks that park: journey/06-locks.md
+  - Architecture:
+      - architecture/index.md
+      - Suspension and continuations: architecture/suspension.md
+      - Compiled modules and linking: architecture/modules.md
+      - Dispatch and external code: architecture/dispatch-and-ffi.md
+      - Evaluation plan: architecture/benchmarks.md
+      - Open decisions: architecture/open-decisions.md
+      - Changes and contradictions: architecture/changes.md
   - Decisions: decisions.md
   - Open questions: open-questions.md
   - Repository map: repo-map.md
