@@ -3,7 +3,8 @@
 // declared in the struct, with its comment, and implemented as `fn Server::name` below, where `self` is written out (C++ style). The struct stays short
 // enough to read as the outline of the server.
 // Behaviour is identical to ../../server.stra; only the way the server's own functions are grouped into a type differs.
-package http                                      // an alternative to http/server.stra in another syntax style; the styles are not compiled together
+package http.styles.mixed      // the folder path under stra/; an alternative to http/server.stra in another syntax style
+import http
 import runtime
 
 let routes = [

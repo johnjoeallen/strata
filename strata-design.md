@@ -79,6 +79,7 @@ Direct `WeakRef<T>` access may optionally use implicit temporary promotion and r
 ### 3.2 Parent–child relationships
 
 ```cpp
+// app/parent.stra
 package app
 
 struct Parent {
@@ -155,6 +156,7 @@ The compiler may place objects in task-local storage only if it proves they cann
 Lifetime parameters are **not** written as named generics. Borrowing is expressed with `T&`; the compiler infers which parameters, object fields or static objects the returned borrow depends on.
 
 ```cpp
+// app/choose.stra
 package app
 
 fn choose(a: Customer&, b: Customer&, first: bool): Customer& {
@@ -187,6 +189,7 @@ C declarations contain no trustworthy ownership or lifetime semantics. Bindings 
 Strata aims for Java-virtual-thread-style programming: thousands of logical tasks running ordinary blocking-looking code on a limited number of OS workers.
 
 ```cpp
+// app/serve.stra
 package app
 
 fn serve(listener: Listener&) {
@@ -264,6 +267,7 @@ Requested ordering policy: fair FIFO admission of access requests, batching cons
 Application code should not need to write synchronization blocks for each cache operation:
 
 ```cpp
+// app/cache.stra
 package app
 
 fn cacheGet(cache: Ref<Cache>, key: i64): i64 {
@@ -440,7 +444,7 @@ Strata source -> parse/semantic analysis -> typed Strata IR
    -> continuation lowering -> generated C -> C compiler and linker -> executable
 ```
 
-0. **Packages.** Every source file starts with `package name`. The files sharing a name form a package, which compiles to one `.smod`; declarations are visible across the package with no import, and `import other` names another package. A package declaration may carry `[yield]`, `[noyield]` or `[nopark]` as the default for its functions (in one file only), overridden by a type and then by a function. Placeholder syntax; details in `docs/architecture/open-decisions.md` (D14).
+0. **Packages.** Java folder convention: a package is a folder, named by its path under the source root (`http.styles.cpp`), and every file in it starts with the same `package` line. A package compiles to one `.smod`; declarations are visible across the package with no import, and `import other` names another package. The package line may carry `[yield]`, `[noyield]` or `[nopark]` as the default for its functions, repeated identically in every file, overridden by a type and then by a function. Placeholder syntax; details in `docs/architecture/open-decisions.md` (D14).
 1. **Module contents come in tiers.** Tier A (contract) is required for correctness; Tier B (generic and exposed bodies) for instantiation; Tier C (the rest of the IR, call-graph edges, park-point tables) only for optimisation. A program links correctly with Tier A and the Level-0 ABI alone.
 2. **Level-0 ABI** is the stable boundary: calling convention, `DONE/THROWN/PARKED` status, the frame header, vtable layout, exported type layout. A function's frame *body* is private, so changing it never breaks callers.
 3. **Two build modes.** Incremental: each module compiled and lowered independently against imported contracts; unchanged contract hashes stop the rebuild. Optimised: whole-application analysis over retained IR; re-lowers only chains it changes.

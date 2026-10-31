@@ -34,6 +34,7 @@ Mutability, escape (retains/publishes), access mode per parameter, and `fresh` a
 A test or a command-line tool builds a store and reads it back in one vthread. Nothing escapes, so there is nothing to lock.
 
 ```cpp
+// tools/load.stra
 package tools
 
 fn loadAndCount(path: string&): usize {
@@ -50,6 +51,7 @@ Under the earlier `SharedRef` idea this would have needed a different type or a 
 ## Example 2: what `Db` needs and what it does not
 
 ```cpp
+// redis/db.stra
 package redis
 
 struct Db {                               // every field is set in make() and never written again: write-once
@@ -80,6 +82,7 @@ struct Db {                               // every field is set in make() and ne
 ## Example 3: errors the compiler reports
 
 ```cpp
+// redis/stats.stra
 package redis
 
 fn size(db: Db&): usize {
@@ -88,6 +91,7 @@ fn size(db: Db&): usize {
 ```
 
 ```cpp
+// redis/trim.stra
 package redis
 
 fn trim(store: Ref<Store>) {
@@ -98,6 +102,7 @@ fn trim(store: Ref<Store>) {
 ```
 
 ```cpp
+// redis/peek.stra
 package redis
 
 fn peekKeys(store: Ref<Store>): Map<Bytes, Entry>& {
@@ -112,6 +117,7 @@ The messages name the chain and the fix. A missing block on a reference that tur
 ## Example 4: publishing, and what changes after it
 
 ```cpp
+// redis/main.stra
 package redis
 
 fn main(args: Args&) {
@@ -128,6 +134,7 @@ Before the `spawn`, `db` is local and could be inspected directly. After it, eve
 ## Example 5: modes across a call
 
 ```cpp
+// redis/expire.stra
 package redis
 
 fn expireAndCount(store: Ref<Store>): usize {

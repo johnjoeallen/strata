@@ -1,6 +1,6 @@
 # Compiled modules and application linking
 
-A **compiled Strata module** (working extension `.smod`; a bundle of them is an archive, `.sar`) is the compiled form of one source *package* (the files that declare the same `package name`, see [D14](open-decisions.md#d14-packages-and-imports)); the module takes the package's name. It is what a library ships and what an application consumes. It carries enough to type-check, lifetime-check, effect-check and optimise a program against it **without the original source**. Names and extensions are placeholders.
+A **compiled Strata module** (working extension `.smod`; a bundle of them is an archive, `.sar`) is the compiled form of one source *package* (a folder of files that all start with the same `package name` line, see [D14](open-decisions.md#d14-packages-and-imports)); the module takes the package's name. It is what a library ships and what an application consumes. It carries enough to type-check, lifetime-check, effect-check and optimise a program against it **without the original source**. Names and extensions are placeholders.
 
 ## 1. Three tiers of information
 

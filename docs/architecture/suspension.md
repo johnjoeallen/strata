@@ -66,11 +66,11 @@ Three attributes on a function (`fn[yield] name(...)`). Spellings are the author
   |---|---|---|
   | Function | `fn[yield] parse()` | its own body |
   | Type | `struct Parser[yield] { ... }` | the methods declared in it |
-  | Package | `package[yield] imaging`, in one file of the package | every function in the package |
+  | Package | `package[yield] imaging`, repeated on the package line of every file in the folder | every function in the package |
   | Default | nothing written | nothing inserted |
 
   A CPU-heavy type marks itself once and tags its hot, bounded helpers `[noyield]`. A `[nopark]` type asserts that none of its methods can park; a method can still override it, and the override is then reported at the method. Files are not a level: a file is a layout accident.
-- **Package.** Every source file starts with `package name`; the files that share a name form one package, which compiles to one `.smod` named after it (placeholder syntax; the rules are in [D14](open-decisions.md#d14-packages-and-imports)). The package default is written on the package declaration, `package[yield] imaging`, in exactly one file of the package (by convention `package.stra`); every other file writes a plain `package imaging`, and an attribute there is an error. Source files therefore carry no conflicting settings.
+- **Package.** Follows the Java folder convention. A package is a folder, its name is the folder path under the source root with dots for slashes (`stra/http/styles/cpp/` is `http.styles.cpp`), and every file in the folder starts with the same `package` line. There is no special file. A package default is written on that package line, `package[yield] imaging`; because the line is repeated in every file, the setting is visible wherever you read, and all files of a package must state the identical line (a file that differs or omits it is an error). The package compiles to one `.smod` named after it. Placeholder syntax; the rules are in [D14](open-decisions.md#d14-packages-and-imports).
 - **Resolved at definition.** The compiler resolves each function's effective attribute when it compiles the defining package, and the IR carries the resolved value. A generic instantiated in another package keeps the setting of the package that defined it; settings are never inherited by importers. The package default is part of the module's input hash: changing it recompiles the package and its effect changes ripple as usual.
 - **Tooling must show the effective setting and its source** (function, type or package) in hover, because it is no longer visible at the function itself. That is the cost of having levels.
 - **Spelling.** The attribute follows `fn` on a function and the name on a type, which differ; whether to unify them (`fn f[yield]`) is **Open**.
@@ -150,6 +150,7 @@ Calls through interfaces, function values and foreign code contribute nothing at
 Illustrative Strata source and C. Neither is compiler output.
 
 ```cpp
+// http/headers.stra
 package http
 
 // Opted in: the compiler inserts a budget check in this loop. May, yields only.
@@ -194,21 +195,34 @@ fn tight(cache: Ref<Cache>, r: Reader&) {
 }
 ```
 
-A type that opts in as a whole, and a package that sets the default for its files (`package.stra` is the one file that may carry package attributes):
+The three levels together. The folder is the package; each file repeats the package line:
+
+```
+imaging/
+    renderer.stra
+    metrics.stra
+```
 
 ```cpp
-// imaging/package.stra
-package[noyield] imaging         // the package default; here it restates that nothing is inserted
-
 // imaging/renderer.stra
-package imaging
+package[yield] imaging                    // package default: functions here get budget checks
 
-struct Renderer[yield] {
-    fn render(page: Page&): string { for b in page.blocks { ... } }   // gets checks: the type says [yield]
-    fn[noyield] crc(data: u8[]&): u32 { ... }                          // override: plain C
-    fn[nopark] width(c: u32): u32 { return c < 128 ? 1 : 2 }          // asserts it never parks
+struct Renderer {                         // no attribute: inherits [yield] from the package
+    fn render(page: Page&): string { for b in page.blocks { ... } }   // gets checks
+    fn[noyield] crc(data: u8[]&): u32 { ... }                          // the function overrides: plain C
 }
+
+// imaging/metrics.stra
+package[yield] imaging                    // the same line as in renderer.stra
+
+struct Metrics[noyield] {                 // the type overrides the package default
+    fn width(c: u32): u32 { return c < 128 ? 1 : 2 }                  // no checks (the type says noyield)
+    fn[yield] widest(text: string&): u32 { for c in text { ... } }    // the function overrides the type
+}
+
+fn[nopark] isAscii(c: u32): bool { return c < 128 }                   // asserts it never parks
 ```
+
 
 Inferred effects and summary fields:
 
@@ -314,6 +328,7 @@ Frames come from a per-function arena, sized exactly. This matches the existing 
 ### Pseudocode
 
 ```
+// db/query.stra
 package db                                  // compiled separately         Park(query) = May   (calls Conn.recv)
 fn query(sql: string&, id: i64): Row throws DbError {
     let c = pool.acquire();                 // May: waits for a free connection
@@ -321,6 +336,7 @@ fn query(sql: string&, id: i64): Row throws DbError {
     return decode(c.recv());                // May
 }
 
+// app/handle.stra
 package app
 import db
 fn handle(req: Request&): Response throws DbError {

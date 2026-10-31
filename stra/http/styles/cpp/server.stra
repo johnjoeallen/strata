@@ -3,7 +3,8 @@
 // in this file or another module. In an implementation `self` is the Server, and every member (self.table, self.cfg, self.lookup) is written with it.
 // The struct is the table of contents: read it first, then find the implementation below.
 // Behaviour is identical to ../../server.stra; only the way the server's own functions are grouped into a type differs.
-package http                                      // an alternative to http/server.stra in another syntax style; the styles are not compiled together
+package http.styles.cpp      // the folder path under stra/; an alternative to http/server.stra in another syntax style
+import http
 import runtime
 
 let routes = [

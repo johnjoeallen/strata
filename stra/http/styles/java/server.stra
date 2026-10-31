@@ -2,7 +2,8 @@
 // There is no separate declaration: the body is the declaration. Inside a method `table`, `cfg` and `lookup` are the members; `self.` is needed only to
 // tell a member from a parameter or local of the same name, or to write a member, and nothing here needs it.
 // Behaviour is identical to ../../server.stra; only the way the server's own functions are grouped into a type differs.
-package http                                      // an alternative to http/server.stra in another syntax style; the styles are not compiled together
+package http.styles.java      // the folder path under stra/; an alternative to http/server.stra in another syntax style
+import http
 import runtime
 
 let routes = [
