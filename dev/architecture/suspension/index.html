@@ -733,10 +733,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#11-budget-checks-and-the-never-tag" class="md-nav__link">
+  <a href="#11-budget-checks-and-the-nopark-tag" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1.1 Budget checks and the never tag
+        1.1 Budget checks and the nopark tag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-checks-fnnopark-and-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: checks, fn[nopark] and sync
       
     </span>
   </a>
@@ -1245,10 +1256,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#11-budget-checks-and-the-never-tag" class="md-nav__link">
+  <a href="#11-budget-checks-and-the-nopark-tag" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1.1 Budget checks and the never tag
+        1.1 Budget checks and the nopark tag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-checks-fnnopark-and-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: checks, fn[nopark] and sync
       
     </span>
   </a>
@@ -1484,7 +1506,7 @@
 <li>Entering <code>sync</code>/<code>mutate</code> (it queues FIFO, see spec 7.1). The body of the block can never park, so a lock is never held across a suspension.</li>
 <li>A call to a function whose summary is <code>May</code>, or <code>Cond(P)</code> with a member of <code>P</code> bound to something that may park.</li>
 <li>A call through an interface or function value whose declared bound permits parking (see <a href="../dispatch-and-ffi/#interface-calls">dispatch</a>).</li>
-<li>A <strong>compiler-inserted budget check</strong> (Decided by the author; mechanism Direction). Every loop back-edge and every recursive call entry in a function not tagged <code>never</code> carries a check: decrement a per-worker budget, and when it is exhausted the task yields, which is an ordinary park point. This makes every function that contains a loop or recursion <code>May</code>, unless it is tagged <code>never</code>. See section 1.1.</li>
+<li>A <strong>compiler-inserted budget check</strong> (Decided by the author; mechanism Direction). Every loop back-edge and every recursive call entry in a function not tagged <code>nopark</code> carries a check: decrement a per-worker budget, and when it is exhausted the task yields, which is an ordinary park point. This makes every function that contains a loop or recursion <code>May</code>, unless it is tagged <code>nopark</code>. See section 1.1.</li>
 <li>A call to a blocking foreign function that the runtime offloads (see <a href="../dispatch-and-ffi/#blocking-foreign-calls">blocking FFI</a>).</li>
 </ol>
 <p>Cleanup methods are <code>Never</code> by rule (spec section 9). A cleanup that tries to call a <code>May</code> function is a compile error, which is already the behaviour for <code>sync</code>/<code>mutate</code> bodies.</p>
@@ -1503,18 +1525,85 @@
 <ul>
 <li><strong>No colouring in source.</strong> Nothing is written to opt in or out of parking. This is the one exception to principle 10 ("no hidden behaviour"), and it is unchanged.</li>
 <li><strong>Visibility is tooling's job</strong> (Decided, principle 10): hover, lints and errors that name the chain <code>handle -&gt; loadUser -&gt; pool.acquire -&gt; Conn.recv</code>.</li>
-<li><strong>The <code>never</code> tag</strong> (Decided as the opt-out; spelling a placeholder, see <a href="../open-decisions/#d4-representing-effects-in-public-interfaces">D4</a>). A function written <code>never fn ...</code> is asserted <code>Never</code>: no budget checks are inserted in it, and the compiler rejects any park source in its body, including a call to a <code>May</code> function. It is not a colour: callers do not mention it and it is never required. It is the way to get plain C for a hot loop, and it turns a silent effect change into a compile error at a library boundary.</li>
+<li><strong>The <code>nopark</code> tag</strong>, written as an attribute on the function: <code>fn[nopark] hash(key: u8[]&amp;): u64</code>. The opt-out is decided; the attribute spelling is the author's choice, with other details still open, see <a href="../open-decisions/#d4-representing-effects-in-public-interfaces">D4</a>. A function written <code>fn[nopark] ...</code> is asserted <code>Never</code>: no budget checks are inserted in it, and the compiler rejects any park source in its body, including a call to a <code>May</code> function. It is not a colour: callers do not mention it and it is never required. It is the way to get plain C for a hot loop, and it turns a silent effect change into a compile error at a library boundary.</li>
 </ul>
-<h3 id="11-budget-checks-and-the-never-tag">1.1 Budget checks and the <code>never</code> tag<a class="headerlink" href="#11-budget-checks-and-the-never-tag" title="Permanent link">&para;</a></h3>
+<h3 id="11-budget-checks-and-the-nopark-tag">1.1 Budget checks and the <code>nopark</code> tag<a class="headerlink" href="#11-budget-checks-and-the-nopark-tag" title="Permanent link">&para;</a></h3>
 <p>The default is that code can be interrupted; opting out is explicit.</p>
 <ul>
 <li><strong>Where checks go:</strong> loop back-edges and recursive-call entries, not every function entry. A function with neither (straight-line code calling only <code>Never</code> functions) is inferred <code>Never</code> with no tag.</li>
 <li><strong>What a check is:</strong> a counter decrement and a rarely taken branch. When the budget runs out the task yields to the back of the run queue and resumes in its turn: a park point, so the live values are spilled to a frame exactly as for any park. Checks are also cancellation points, so a task in a long loop can be cancelled (<code>CANCELLED</code> wake, see section 4).</li>
 <li><strong>Cost control (Direction):</strong> strip-mine loops so the counter is tested once per block of iterations, not every iteration; omit the check for loops with a small constant bound. Neither is guaranteed; the overhead on tight loops must be measured (benchmarks B13).</li>
-<li><strong>Regions where a check is a park and so forbidden:</strong> the body of <code>sync</code>/<code>mutate</code>, cleanup methods, and callbacks entered from C. Code there is implicitly <code>never</code>, so a function called from them must be inferred or tagged <code>never</code>. Library functions likely to be used there (copying, hashing, sorting a small array, formatting) are the library author's to tag.</li>
+<li><strong>Regions where a check is a park and so forbidden:</strong> the body of <code>sync</code>/<code>mutate</code>, cleanup methods, and callbacks entered from C. Code there is implicitly <code>nopark</code>, so a function called from them must be inferred or tagged <code>nopark</code>. Library functions likely to be used there (copying, hashing, sorting a small array, formatting) are the library author's to tag.</li>
 <li><strong>Consequence for the effect lattice:</strong> most application functions that loop are now <code>May</code>, so the <code>May</code> path is the common one and the per-call status test (about 0.7 to 1.5 ns, hand-written C, toy) applies broadly. The <code>yields</code> bit in the summary distinguishes "<code>May</code> only because of budget checks" from "can wait on I/O or a lock"; such a function never blocks on anything external.</li>
 <li><strong>Not a build option:</strong> checks are language semantics, so effect summaries are the same for every build and modules from different builds can be mixed. An experimental switch to disable checks exists only to measure their cost and stamps the module header; such modules do not link into a normal build.</li>
-<li><strong>Limits that remain:</strong> the budget bounds how long a <em>checked</em> region runs, not how long a <code>never</code> function, a plain <code>extern fn</code>, or a single indivisible library operation runs. A <code>never</code> function that loops without bound still stalls its worker, and that is now the author's explicit decision (tooling should warn on an unbounded loop in a <code>never</code> function).</li>
+<li><strong>Limits that remain:</strong> the budget bounds how long a <em>checked</em> region runs, not how long a <code>nopark</code> function, a plain <code>extern fn</code>, or a single indivisible library operation runs. A <code>nopark</code> function that loops without bound still stalls its worker, and that is now the author's explicit decision (tooling should warn on an unbounded loop in a <code>nopark</code> function).</li>
+</ul>
+<h3 id="example-checks-fnnopark-and-sync">Example: checks, <code>fn[nopark]</code> and <code>sync</code><a class="headerlink" href="#example-checks-fnnopark-and-sync" title="Permanent link">&para;</a></h3>
+<p>Illustrative Strata source and the C a compiler might emit. Neither is compiler output.</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Loops and is not tagged: the compiler inserts a budget check. May, yields only.</span>
+<span class="n">fn</span><span class="w"> </span><span class="nf">parseHeaders</span><span class="p">(</span><span class="n">buf</span><span class="o">:</span><span class="w"> </span><span class="n">u8</span><span class="p">[]</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">Headers</span><span class="w"> </span><span class="k">throws</span><span class="w"> </span><span class="n">BadRequest</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">var</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Headers</span><span class="p">();</span>
+<span class="w">    </span><span class="n">var</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">buf</span><span class="p">.</span><span class="n">len</span><span class="w"> </span><span class="p">{</span><span class="w">              </span><span class="c1">// back-edge: budget check inserted here</span>
+<span class="w">        </span><span class="n">let</span><span class="w"> </span><span class="n">line</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nextLine</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">);</span>
+<span class="w">        </span><span class="n">h</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">line</span><span class="p">);</span>
+<span class="w">        </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">line</span><span class="p">.</span><span class="n">end</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">h</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Hot, bounded, used under a lock: opt out. Plain C, no checks, may not park.</span>
+<span class="n">fn</span><span class="p">[</span><span class="n">nopark</span><span class="p">]</span><span class="w"> </span><span class="n">hash</span><span class="p">(</span><span class="n">key</span><span class="o">:</span><span class="w"> </span><span class="n">u8</span><span class="p">[]</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">u64</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">var</span><span class="w"> </span><span class="n">x</span><span class="o">:</span><span class="w"> </span><span class="n">u64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">14695981039346656037</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">^</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1099511628211</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// no check</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">x</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">fn</span><span class="w"> </span><span class="n">lookup</span><span class="p">(</span><span class="n">cache</span><span class="o">:</span><span class="w"> </span><span class="n">Ref</span><span class="o">&lt;</span><span class="n">Cache</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">key</span><span class="o">:</span><span class="w"> </span><span class="n">u8</span><span class="p">[]</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">i64</span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">let</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hash</span><span class="p">(</span><span class="n">key</span><span class="p">);</span><span class="w">               </span><span class="c1">// Never: fine</span>
+<span class="w">    </span><span class="n">sync</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">                    </span><span class="c1">// the body is implicitly nopark</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">cache</span><span class="p">.</span><span class="n">entries</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="n">h</span><span class="p">);</span><span class="w"> </span><span class="c1">// get() must be nopark, or this is a compile error</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">fn</span><span class="p">[</span><span class="n">nopark</span><span class="p">]</span><span class="w"> </span><span class="n">broken</span><span class="p">(</span><span class="n">k</span><span class="o">:</span><span class="w"> </span><span class="n">u8</span><span class="p">[]</span><span class="o">&amp;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="n">ms</span><span class="p">);</span><span class="w">                      </span><span class="c1">// error: park source in a nopark function</span>
+<span class="w">                                     </span><span class="c1">//   broken -&gt; sleep (extern parks)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Inferred effects:</p>
+<div class="highlight"><pre><span></span><code>hash          Never                 (tagged; no checks)
+nextLine      Never                 (no loop, calls only Never functions)
+parseHeaders  May, yields=true      (checks only; cannot wait on I/O or a lock)
+lookup        May                   (acquiring the lock can park)
+</code></pre></div>
+<p>C for <code>parseHeaders</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">st_t</span><span class="w"> </span><span class="nf">parseHeaders_call</span><span class="p">(</span><span class="n">task_t</span><span class="w"> </span><span class="o">*</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">u8buf</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">Headers</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Headers</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">headers_new</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">size_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">buf</span><span class="o">-&gt;</span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">--</span><span class="n">t</span><span class="o">-&gt;</span><span class="n">worker</span><span class="o">-&gt;</span><span class="n">budget</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">              </span><span class="c1">// budget check</span>
+<span class="w">            </span><span class="c1">// a yield is a real park: spill live values into a frame</span>
+<span class="w">            </span><span class="n">parse_frame</span><span class="w"> </span><span class="o">*</span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">frame_new</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">parseHeaders_resume</span><span class="p">,</span><span class="w"> </span><span class="cm">/*state*/</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">            </span><span class="n">f</span><span class="o">-&gt;</span><span class="n">buf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">buf</span><span class="p">;</span><span class="w"> </span><span class="n">f</span><span class="o">-&gt;</span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">h</span><span class="p">;</span><span class="w"> </span><span class="n">f</span><span class="o">-&gt;</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w">        </span><span class="c1">// buf is a borrowed parameter, see D2</span>
+<span class="w">            </span><span class="n">run_queue_push_back</span><span class="p">(</span><span class="n">t</span><span class="p">);</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">PARKED</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">Line</span><span class="w"> </span><span class="n">line</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nextLine</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">);</span><span class="w">                </span><span class="c1">// plain call</span>
+<span class="w">        </span><span class="n">headers_add</span><span class="p">(</span><span class="o">&amp;</span><span class="n">h</span><span class="p">,</span><span class="w"> </span><span class="n">line</span><span class="p">);</span>
+<span class="w">        </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">line</span><span class="p">.</span><span class="n">end</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="o">*</span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">h</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">DONE</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="c1">// parseHeaders_resume re-enters the loop with f-&gt;h and f-&gt;i restored, or on CANCELLED</span>
+<span class="c1">// runs the cleanups for h, frees the frame and returns CANCELLED.</span>
+</code></pre></div>
+<ul>
+<li><code>hash</code> has no counter and no status, so the C compiler can inline it freely.</li>
+<li>On the common path a check costs a decrement and a branch per iteration. Strip-mining would test once per block. Neither cost nor strip-mining is measured yet (B13).</li>
+<li>If <code>buf</code> pointed at a native-stack local in the caller, the caller would need a frame-resident local, or the yield would leave a dangling borrow (<a href="../open-decisions/#d2-borrowed-locals-and-the-lazy-shape">D2</a>).</li>
+<li>Library functions used inside <code>sync</code>/<code>mutate</code> (here <code>entries.get</code>) must be <code>fn[nopark]</code>, so the standard library needs a deliberate tagging pass (<a href="../open-decisions/#d13-runaway-non-parking-code">D13</a>).</li>
 </ul>
 <h2 id="2-lowering-to-resumable-frames">2. Lowering to resumable frames<a class="headerlink" href="#2-lowering-to-resumable-frames" title="Permanent link">&para;</a></h2>
 <h3 id="the-three-shapes-of-a-function">The three shapes of a function<a class="headerlink" href="#the-three-shapes-of-a-function" title="Permanent link">&para;</a></h3>
@@ -1653,7 +1742,7 @@ fn handle(req: Request&amp;) -&gt; Response throws DbError {
 <p>Case 2 is mechanical. Case 1 is not: <code>let buf = readBuffer(); conn.recv(buf&amp;)</code> is exactly this shape, and extremely common.</p>
 <p><strong>Direction:</strong> a local that is borrowed <em>and</em> live across a call that may park is <strong>frame-resident</strong> from its declaration, in a frame created at function entry. A function with any frame-resident local uses the eager shape for that function. Other functions in the chain stay lazy. The borrow-origin analysis (spec section 5) already has what is needed to decide this; the new fact is only that the flag <em>borrowed across a may-park call</em> is recorded for each local. This is a real constraint on how often <code>lazy</code> applies, and not measured: the toy benchmark has no borrowed locals. See <a href="../open-decisions/#d2-borrowed-locals-and-the-lazy-shape">open decision D2</a>.</p>
 <h2 id="3-calls-that-never-suspend">3. Calls that never suspend<a class="headerlink" href="#3-calls-that-never-suspend" title="Permanent link">&para;</a></h2>
-<p><code>Never</code> functions compile to ordinary C and are inlined by the C compiler under its usual rules. With budget checks on by default, a <code>Never</code> function is one that has no loop or recursion and calls only <code>Never</code> functions, or one tagged <code>never</code>. Parsing, rendering and hashing helpers that loop are <code>May</code> unless tagged, and the hot, bounded ones should be tagged. A <code>Cond(P)</code> function called with a known non-parking argument binds to its plain entry.</p>
+<p><code>Never</code> functions compile to ordinary C and are inlined by the C compiler under its usual rules. With budget checks on by default, a <code>Never</code> function is one that has no loop or recursion and calls only <code>Never</code> functions, or one tagged <code>nopark</code>. Parsing, rendering and hashing helpers that loop are <code>May</code> unless tagged, and the hot, bounded ones should be tagged. A <code>Cond(P)</code> function called with a known non-parking argument binds to its plain entry.</p>
 <p>For a <code>May</code> function the non-suspending path should be straight-line C with one status test after each <code>May</code> call. The cost of that test is what the 0.7 to 1.5 ns above measures.</p>
 <h2 id="4-errors-cancellation-and-cleanup">4. Errors, cancellation and cleanup<a class="headerlink" href="#4-errors-cancellation-and-cleanup" title="Permanent link">&para;</a></h2>
 <h3 id="errors-throws">Errors (<code>throws</code>)<a class="headerlink" href="#errors-throws" title="Permanent link">&para;</a></h3>
@@ -1662,7 +1751,7 @@ fn handle(req: Request&amp;) -&gt; Response throws DbError {
 <h3 id="cancellation-direction">Cancellation (Direction)<a class="headerlink" href="#cancellation-direction" title="Permanent link">&para;</a></h3>
 <p>Cooperative, as in spec 6.2: the cancelling party marks the task and wakes it. A task is only ever cancelled <strong>at a park point</strong>, because that is where its state is in a frame. The wake carries <code>wake = CANCELLED</code>, and <code>f_resume</code> takes the unwinding path: run cleanups of the scopes it is in, free its own frame, resume the parent with <code>CANCELLED</code>, and so on up the chain. Frames are never discarded without running cleanups, and cleanups never park, so unwinding is bounded.</p>
 <p>Cancellation is <strong>not an ordinary exception</strong>: it is not named in <code>throws</code>, and <code>catch</code> cannot swallow it. Letting <code>catch (Exception)</code> swallow it would make cancellation unreliable; requiring it in <code>throws</code> would put the effect back in signatures everywhere. This choice interacts with the open exception-model question (spec 10.7) and is stated here as Direction only.</p>
-<p>A task can be cancelled at any park point, including a budget check, so a task spinning in a checked loop is cancellable. A task inside a <code>never</code> function, a plain <code>extern fn</code> or an indivisible library operation is not, until it returns.</p>
+<p>A task can be cancelled at any park point, including a budget check, so a task spinning in a checked loop is cancellable. A task inside a <code>nopark</code> function, a plain <code>extern fn</code> or an indivisible library operation is not, until it returns.</p>
 <h3 id="deterministic-cleanup">Deterministic cleanup<a class="headerlink" href="#deterministic-cleanup" title="Permanent link">&para;</a></h3>
 <p>Cleanup of a resource runs when its scope exits, by normal return, <code>THROWN</code> or <code>CANCELLED</code>, and happens before the frame is freed. Task-level cleanup precedes reclamation of any task arena (spec section 9, unchanged). A parked task holding a <code>sync</code> permission is impossible by construction (no park inside the block), so no frame ever owns a lock.</p>
 <h2 id="5-recursion">5. Recursion<a class="headerlink" href="#5-recursion" title="Permanent link">&para;</a></h2>
