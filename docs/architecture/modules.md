@@ -57,10 +57,15 @@ Summary(f) = {
   park:    Never | May | Cond(P)
   throws:  set of exception types that can escape
   foreign: none | nonblocking | blocking          // reaches a foreign call (see dispatch page)
-  yields:  bool                                    // park=May only because of compiler-inserted budget checks; cannot wait on I/O or a lock
+  yields:  bool                                    // park=May only because of compiler-inserted budget checks ([yield]); cannot wait on I/O or a lock
+}
+advisory (not hashed into the contract) = {
+  loops:   none | bounded | long | unbounded       // loop and recursion class of f including its callees; feeds the loop warnings
 }
 invariants: cleanup methods are Never; foreign=blocking implies park=May
 ```
+
+**The `loops` class is advisory.** It records, for each exported function, the worst loop class among its own loops and those of its direct callees (nested loops compose; see [suspension 1.3](suspension.md#13-loop-warnings)). It exists so a caller's lint can warn about `tight -> parse -> scanForever` when `scanForever` is in another module and its source is not available. It is stored in Tier A but kept out of the contract hash on purpose: loop structure changes often, and a change from `bounded` to `long` must not force every dependant to recompile. Consequences: a warning can lag until the caller's lint next reads the callee's current `.smod`, and `loops` is never used for code generation. Calls through interfaces, function values and foreign code are recorded as `unknown` contributions and not as a class.
 
 `Cond(P)` is stored symbolically, so a downstream module can resolve it with its own arguments. A conditional effect through a type parameter (`T.compare` that might park) is stored as `Cond({T})` and resolved at instantiation.
 
@@ -128,6 +133,7 @@ The minimum IR needed for cross-module optimisation is [open (D3)](open-decision
 - **ABI version**: the Level-0 rules in the table above. A different ABI means a rebuild, never a silent link.
 - **Contract hash**, per exported symbol: a hash of exactly its Tier A entry (and for generics and exposed bodies, the Tier B IR). It is the unit of compatibility.
 - **Module interface hash**: a hash of all contract hashes, for a fast check.
+- **Advisory data** (`loops`) is excluded from every hash above.
 - **Compatibility rule (Direction):** an implementation change that alters no contract hash is compatible. A change that narrows an effect (`May` to `Never`), reduces `throws`, or adds an export is *backward compatible*. A change that widens an effect (`Never` to `May`), adds to `throws`, changes layout or changes a borrow origin is **breaking**, whether or not the signature text changed.
 - **Semantic version policy:** breaking contract changes require a major version; the compiler can compare two versions of a module and print the contract diff (which symbols changed and which dimension). This answers spec 10.10 (API stability) at the tooling level; the policy itself is [Open](open-decisions.md#d4-representing-effects-in-public-interfaces).
 
@@ -189,7 +195,7 @@ Recompile module M when any of these changes:
 2. **A contract hash of any symbol M references.** Granularity is the symbol, not the whole imported module: M is not rebuilt because an unused export of a dependency changed.
 3. **Compiler, runtime ABI, module ABI, C compiler or flag set** (the cache key dimensions).
 4. **An inlined body, in optimised mode only:** if M's cached link-time product inlined or fused a function from N, and that function's Tier B/C IR hash changed.
-5. **Build configuration that affects closed-world decisions:** the set of open interfaces or the entry points. (Budget checks are language semantics and not a build setting, so they are not a dimension here; the experimental switch that disables them is stamped in the header and refused by normal builds.)
+5. **Build configuration that affects closed-world decisions:** the set of open interfaces or the entry points. (Budget checks are chosen by `[yield]`/`[noyield]` in the source, so they are already in the source hash and in the effect summaries; there is no separate build setting to track. The lint level is not a dimension: warnings do not affect generated code.)
 
 Not a reason to recompile M: a change in an imported function's body that leaves its contract hash alone (in incremental mode); a change in an unreferenced export.
 

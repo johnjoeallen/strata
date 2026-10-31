@@ -31,7 +31,7 @@ The HTTP, mini-redis and micro benchmarks in `bench/` are promising (see `docs/j
 | B9 | Very many vthreads | 100k to 1M idle and mostly-idle tasks, memory per task | Extends the existing fiber/frames tables. |
 | B10 | Memory and allocation | Resident and virtual bytes, allocations per request, frame arena fragmentation | Report RSS and VSZ separately; run under THP on and off (a known trap in this project). |
 | B11 | Blocking FFI | Offload pool: latency of the thread hop, behaviour when the pool is full | Compare strategies 2 and 4 of [dispatch](dispatch-and-ffi.md#blocking-foreign-calls). |
-| B13 | Budget-check overhead | Tight loops (hashing, parsing, copying, `brc`-style scans) with checks on, strip-mined, and tagged `nopark`; time to yield and fairness under a CPU-bound task | Decides whether checks-by-default holds. Needs the experimental disable switch. |
+| B13 | Budget-check overhead | Tight loops (hashing, parsing, copying, `brc`-style scans) as plain C, with `[yield]` checks, and with strip-mined checks; time to yield and fairness under a CPU-bound task | The cost of opting in. Also decides whether default-on is ever worth revisiting. |
 | B12 | Mixed realistic service | Parse, route, query, render, with a shared cache (`sync`/`mutate`) | The end-to-end result everything else supports. |
 
 Metrics for all: throughput, CPU utilisation (user, system), p50/p99/p99.9 latency, resident memory, allocations, context switches.

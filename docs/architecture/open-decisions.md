@@ -28,9 +28,9 @@ Recommendation: ship (b) by default as Tier B plus a size-limited Tier C, with t
 
 ## D4. Representing effects in public interfaces
 
-Alternatives: (a) infer everything and export it (current plan); (b) require the author to declare the effect of public functions; (c) infer, and let the author optionally assert a bound.
+Alternatives: (a) infer everything and export it (current plan); (b) require the author to declare the effect of public functions; (c) infer, and let the author optionally assert it.
 
-(b) reintroduces colouring. (a) alone lets an implementation change ripple silently through dependants. Recommendation: (c) - an optional `nopark` tag (the opt-out from budget checks, see [suspension 1.1](suspension.md#11-budget-checks-and-the-nopark-tag)), plus tooling that prints the contract diff between versions, and a version policy that treats widening as breaking. Open: whether the `[nopark]` attribute form should also replace the existing `parks` modifier (`extern fn[parks]`) and `extern blocking` (`extern fn[blocking]`) for consistency, and whether to allow `parks` on non-extern functions as a "may park" promise for stability.
+(b) reintroduces colouring. (a) alone lets an implementation change ripple silently through dependants. Recommendation: (c) - an optional `[nopark]` assertion (see [suspension 1.1](suspension.md#11-attributes-yield-noyield-nopark)), plus tooling that prints the contract diff between versions, and a version policy that treats widening as breaking. Open: whether the attribute form should also replace the existing `parks` modifier (`extern fn[parks]`) and `extern blocking` (`extern fn[blocking]`) for consistency, and whether to allow `parks` on non-extern functions as a "may park" promise for stability.
 
 ## D5. Recursion and dynamic dispatch
 
@@ -70,12 +70,15 @@ Recommended: not in `throws`, not catchable, runs cleanups. Alternative: a catch
 
 ## D13. Runaway non-parking code
 
-**Decided by the author:** the compiler inserts budget checks in loops and recursion unless the function is tagged `nopark`. Mechanism in [suspension 1.1](suspension.md#11-budget-checks-and-the-nopark-tag).
+**Decided by the author:** the compiler inserts budget checks only in functions marked `[yield]`, or in a file whose default is `[yield]`. `[noyield]` overrides the file default; `[nopark]` asserts that nothing parks. With no attribute nothing is inserted. Mechanism and rules: [suspension 1.1](suspension.md#11-attributes-yield-noyield-nopark). Loops add no effect by default, so the library-tagging burden an earlier default-on design carried is gone.
+
+The price is that unmarked CPU-bound code can stall a worker and cannot be cancelled. Mitigations, all Direction: loop warnings with an advisory `loops` class in the module summary ([suspension 1.3](suspension.md#13-loop-warnings)), a watchdog diagnostic that reports a worker making no progress past a threshold and names the function it is in (it reports and does not interrupt), and the file-level default for CPU-heavy modules.
 
 Still open:
 
-- **Overhead on tight loops.** Unmeasured. Strip-mining and small-constant-bound elision are expected to keep it low; the number decides whether this stays the default. Benchmark B13.
-- **Budget unit and source.** An iteration counter (cheap, not time) against a timestamp (time, but needs a clock read or a flag set from another thread). Recommendation: counter, with the budget sized in iterations per check block, and a watchdog flag as a later addition for fairness across long checked regions.
-- **Ripple.** Most looping code becomes `May`. Library functions used inside `sync`/`mutate`, cleanups and C callbacks must be `nopark`; the standard library needs a deliberate pass. Recommendation: standard-library collections, copying, formatting and hashing are tagged `nopark` where their cost is bounded by a declared limit.
-- **Where the check can be wrong.** Unbounded `nopark` loops, plain `extern fn`, and large indivisible library operations still stall a worker. Recommendation: a lint on unbounded loops in `nopark` functions, and a watchdog diagnostic for workers that make no progress.
-- **Interaction with fusion and the lazy shape.** A check is a park point inside a loop, so the loop's live values must be spillable; a loop with borrowed locals falls under [D2](#d2-borrowed-locals-and-the-lazy-shape) too.
+- **Overhead of a check** in a `[yield]` loop. Unmeasured; strip-mining and small-bound elision are expected to keep it low. Benchmark B13.
+- **Budget unit.** An iteration counter (cheap, not time) against a timestamp or a flag set from another thread. Recommendation: counter, sized in iterations per check block; the watchdog flag later.
+- **Stated loop bounds.** `while cond [max N]`, enforced in debug builds, would let the author declare a bound instead of suppressing a warning.
+- **Lambdas** inheriting the enclosing function's setting.
+- **Default revisited.** Whether checks should become the default later, once B13 and a real compiler show the cost and the ripple. The earlier design made them the default and was reversed before any implementation.
+- **Interaction with the lazy shape.** A check is a park point inside a loop, so the loop's live values must be spillable; a loop with borrowed locals falls under [D2](#d2-borrowed-locals-and-the-lazy-shape) too.

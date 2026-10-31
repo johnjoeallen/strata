@@ -21,7 +21,7 @@ A function's own body can park only through these, and the analysis starts from 
 2. Entering `sync`/`mutate` (it queues FIFO, see spec 7.1). The body of the block can never park, so a lock is never held across a suspension.
 3. A call to a function whose summary is `May`, or `Cond(P)` with a member of `P` bound to something that may park.
 4. A call through an interface or function value whose declared bound permits parking (see [dispatch](dispatch-and-ffi.md#interface-calls)).
-5. A **compiler-inserted budget check** (Decided by the author; mechanism Direction). Every loop back-edge and every recursive call entry in a function not tagged `nopark` carries a check: decrement a per-worker budget, and when it is exhausted the task yields, which is an ordinary park point. This makes every function that contains a loop or recursion `May`, unless it is tagged `nopark`. See section 1.1.
+5. A **compiler-inserted budget check**, only in a function that asks for one with `[yield]`, directly or through a file-level default (section 1.1). The check sits on loop back-edges and recursive-call entries of that function's own body; when the budget is exhausted the task yields, which is an ordinary park point. Without `[yield]` the compiler inserts nothing.
 6. A call to a blocking foreign function that the runtime offloads (see [blocking FFI](dispatch-and-ffi.md#blocking-foreign-calls)).
 
 Cleanup methods are `Never` by rule (spec section 9). A cleanup that tries to call a `May` function is a compile error, which is already the behaviour for `sync`/`mutate` bodies.
@@ -45,29 +45,98 @@ Across modules the same computation runs on summaries (a few words per function)
 
 ### Programmer-facing consequences
 
-- **No colouring in source.** Nothing is written to opt in or out of parking. This is the one exception to principle 10 ("no hidden behaviour"), and it is unchanged.
+- **No colouring in source.** Waiting (I/O, locks, sleeping) is inferred, never written. This is the one exception to principle 10 ("no hidden behaviour"), and it is unchanged.
+- **Nothing is inserted unless the code says so.** The compiler adds a yield only inside a function marked `[yield]`. This keeps principle 10 intact for scheduling: what the code says is what happens.
 - **Visibility is tooling's job** (Decided, principle 10): hover, lints and errors that name the chain `handle -> loadUser -> pool.acquire -> Conn.recv`.
-- **The `nopark` tag**, written as an attribute on the function: `fn[nopark] hash(key: u8[]&): u64`. The opt-out is decided; the attribute spelling is the author's choice, with other details still open, see [D4](open-decisions.md#d4-representing-effects-in-public-interfaces). A function written `fn[nopark] ...` is asserted `Never`: no budget checks are inserted in it, and the compiler rejects any park source in its body, including a call to a `May` function. It is not a colour: callers do not mention it and it is never required. It is the way to get plain C for a hot loop, and it turns a silent effect change into a compile error at a library boundary.
 
-### 1.1 Budget checks and the `nopark` tag
+### 1.1 Attributes: `[yield]`, `[noyield]`, `[nopark]`
 
-The default is that code can be interrupted; opting out is explicit.
+Three attributes on a function (`fn[yield] name(...)`). Spellings are the author's; the rest is Direction.
 
-- **Where checks go:** loop back-edges and recursive-call entries, not every function entry. A function with neither (straight-line code calling only `Never` functions) is inferred `Never` with no tag.
-- **What a check is:** a counter decrement and a rarely taken branch. When the budget runs out the task yields to the back of the run queue and resumes in its turn: a park point, so the live values are spilled to a frame exactly as for any park. Checks are also cancellation points, so a task in a long loop can be cancelled (`CANCELLED` wake, see section 4).
-- **Cost control (Direction):** strip-mine loops so the counter is tested once per block of iterations, not every iteration; omit the check for loops with a small constant bound. Neither is guaranteed; the overhead on tight loops must be measured (benchmarks B13).
-- **Regions where a check is a park and so forbidden:** the body of `sync`/`mutate`, cleanup methods, and callbacks entered from C. Code there is implicitly `nopark`, so a function called from them must be inferred or tagged `nopark`. Library functions likely to be used there (copying, hashing, sorting a small array, formatting) are the library author's to tag.
-- **Consequence for the effect lattice:** most application functions that loop are now `May`, so the `May` path is the common one and the per-call status test (about 0.7 to 1.5 ns, hand-written C, toy) applies broadly. The `yields` bit in the summary distinguishes "`May` only because of budget checks" from "can wait on I/O or a lock"; such a function never blocks on anything external.
-- **Not a build option:** checks are language semantics, so effect summaries are the same for every build and modules from different builds can be mixed. An experimental switch to disable checks exists only to measure their cost and stamps the module header; such modules do not link into a normal build.
-- **Limits that remain:** the budget bounds how long a *checked* region runs, not how long a `nopark` function, a plain `extern fn`, or a single indivisible library operation runs. A `nopark` function that loops without bound still stalls its worker, and that is now the author's explicit decision (tooling should warn on an unbounded loop in a `nopark` function).
+| Attribute | Budget checks | May wait on I/O or a lock | Meaning |
+|---|---|---|---|
+| none | none, unless the file says `[yield]` | inferred | The default: nothing inserted |
+| `[yield]` | inserted in this function's own loops and recursion | inferred | "The compiler may yield for me here" |
+| `[noyield]` | none, even if the file says `[yield]` | inferred | Overrides a file-level default |
+| `[nopark]` | none | no | Assertion: any park source is a compile error. Implies `[noyield]` |
 
-### Example: checks, `fn[nopark]` and `sync`
+- **File-level default.** A `[yield]` line at the top of a file (placeholder spelling) makes it the default for every function in the file. `[noyield]` or `[nopark]` on a function overrides it. A CPU-heavy module marks itself once and tags its hot, bounded helpers.
+- **Own body only.** `[yield]` does not make callees yield. It is shorthand for a `yield()` every N iterations of the function's own loops. Its callers become `May` by ordinary inference.
+- **The effect widens only if a check is inserted.** A `[yield]` function with no loop or recursion stays `Never`; tagging it causes no ripple.
+- **What a check is:** a counter decrement and a rarely taken branch. On exhaustion the task goes to the back of the run queue and resumes in its turn: a park point, so live values are spilled to a frame as for any park. A check is also a cancellation point, so a task in a `[yield]` loop can be cancelled (section 4).
+- **Cost control (Direction):** strip-mine loops so the counter is tested once per block of iterations; omit the check for loops with a small constant bound. Neither is guaranteed. The overhead is a measurement to take, not assume (benchmarks B13).
+- **`[nopark]` is the strict form.** It is the only form that guarantees the function is `Never`. `[noyield]` still permits a call to `recv`. It is an optional assertion, never required, and never mentioned by callers; it turns a silent effect change into a compile error at a library boundary.
+- **Lambdas** inherit the setting of the enclosing function (**Open**).
+- **`[yield]` is not the `yield()` call.** `yield()` is an `extern parks fn` the program calls itself. The attribute only lets the compiler insert yields.
+- **Limits:** the budget bounds how long a *checked* region runs. It does not bound a function without `[yield]`, a plain `extern fn`, or a single indivisible library operation. Such code stalls its worker and cannot be cancelled until it returns. The loop warnings in 1.3 exist to find it.
 
-Illustrative Strata source and the C a compiler might emit. Neither is compiler output.
+### 1.2 Calls allowed in `sync`/`mutate` bodies, cleanups and C callbacks
+
+These regions may not park, so they may call only functions whose effect is `Never`.
+
+Allowed:
+
+- A function inferred `Never`: no park source anywhere below it. Looping helpers qualify, since without `[yield]` loops add no effect.
+- A function tagged `[nopark]`.
+- A `Cond(P)` function whose arguments are statically non-parking.
+- A plain `extern fn` (a promise of a short, non-blocking call; unverifiable).
+- Operations that do not park: `new`, field access, `throw`, `Ref` copies.
+
+Rejected, with the call chain in the message:
+
+- Any `May` function. That includes one that is `May` only because it is marked `[yield]` and has a loop.
+- Anything that parks: `sleep`, `recv`, `send`, `yield()`.
+- Entering another `sync`/`mutate`, unless that object is in the same head.
+- A call through an interface or function value whose declared bound is not `Never` (the default bound is `May`).
+
+Inside such a region a `[yield]` marking is ignored for the region's own loops: no check is inserted there, and a file-level `[yield]` does not apply.
+
+**Why a body may not park** (the rule is a design choice, not a technical limit; frames could hold a lock):
+
+1. *Hold time stays bounded by the code in the block.* A holder parked on a socket keeps the lock while every other vthread queues; with FIFO fairness one waiting writer also blocks the readers behind it.
+2. *Two vthreads on one worker never contend.* A body that cannot park runs to completion before anything else runs on that worker, so contention is only across workers, where the runtime can spin briefly before parking. That spin removed a 55 to 75 percent throughput loss (`bench/results/miniredis.md`).
+3. *Multi-object blocks retry safely.* `mutate(a, b)` takes all its locks before the body runs, or none, and backs off if one is busy. This is safe only because no body code has run. It is also why nested acquisition is an error.
+4. *No frame ever owns a lock.* Cancellation, errors and unwinding never have to release a lock on behalf of a suspended task.
+5. *A class of deadlocks cannot be written:* a holder waiting for something that another vthread can provide only after taking the same lock.
+
+What it costs: no I/O under a lock (copy out, release, then act, as `Db.get` and `Db.set` do), and long work under a lock must be chunked (`purgeExpired` removes at most `PURGE_BATCH` keys per hold).
+
+### 1.3 Loop warnings
+
+A lint, not a proof. Termination is undecidable, so these are warnings and never errors.
+
+**Classification.** Each loop gets a class, and each function gets a `loops` class in its summary, composed over its callees by the same rules as nested loops:
+
+| `loops` | Meaning |
+|---|---|
+| `none` | No loop or recursion |
+| `bounded` | Every loop has a constant bound under a threshold, or a bound taken from a stated limit (principle 11) |
+| `long` | A constant bound above the threshold, nested loops whose product exceeds it, or a bound set by input of unstated size |
+| `unbounded` | `loop {}`, or `while` where nothing moves the condition toward exit, or unbounded recursion |
+
+Calls through interfaces, function values and foreign code contribute nothing at normal levels (a lint is not a proof) and are listed as `unknown` at the strictest level.
+
+**What warns.** Within `[noyield]`, `[nopark]` and `sync`/`mutate` bodies:
+
+- `unbounded` own loop or recursion;
+- a call to a function whose summary says `unbounded` (the chain is printed: `tight -> parse -> scanForever`);
+- `long`, at the stricter levels.
+
+**When it runs.** Off by default in ordinary builds, except for one case: **`unbounded` inside a `sync`/`mutate` body always warns**, because spec 7.1 relies on hold time being bounded by the block, and nothing else enforces it. A flag selects levels (placeholder `--warn-loops=off|marked|reachable|all`): `marked` covers `[noyield]` and `[nopark]` functions; `reachable` adds unmarked functions reachable from `spawn` roots; `all` adds everything. Editor and CI use it freely.
+
+**Suppression.** An allow-attribute on the function or loop (placeholder). **Open:** a stated bound on the loop itself (`while cond [max 1000]`), enforced in debug builds, which would also make the class `bounded`.
+
+**What the module exposes.** The `loops` class is part of each exported function's summary, in a separate *advisory* section that is **not** part of the contract hash, so a change in loop structure never forces dependants to recompile. A caller's lint reads the callee's current `.smod`, and the warning can lag until relink ([modules](modules.md#effect-summaries)).
+
+**Known limits.** It will miss unbounded work inside loops that look bounded, flag some bounded loops it cannot prove bounded, and sees foreign and indirect calls only as stated.
+
+### Example: attributes, `sync` and loop warnings
+
+Illustrative Strata source and C. Neither is compiler output.
 
 ```cpp
-// Loops and is not tagged: the compiler inserts a budget check. May, yields only.
-fn parseHeaders(buf: u8[]&): Headers throws BadRequest {
+// Opted in: the compiler inserts a budget check in this loop. May, yields only.
+fn[yield] parseHeaders(buf: u8[]&): Headers throws BadRequest {
     var h = Headers();
     var i = 0;
     while i < buf.len {              // back-edge: budget check inserted here
@@ -78,17 +147,17 @@ fn parseHeaders(buf: u8[]&): Headers throws BadRequest {
     return h;
 }
 
-// Hot, bounded, used under a lock: opt out. Plain C, no checks, may not park.
-fn[nopark] hash(key: u8[]&): u64 {
+// No attribute: nothing inserted. No loop effect, so Never: usable under a lock.
+fn hash(key: u8[]&): u64 {
     var x: u64 = 14695981039346656037;
-    for b in key { x = (x ^ b) * 1099511628211; }   // no check
+    for b in key { x = (x ^ b) * 1099511628211; }
     return x;
 }
 
 fn lookup(cache: Ref<Cache>, key: u8[]&): i64? {
     let h = hash(key);               // Never: fine
-    sync(cache) {                    // the body is implicitly nopark
-        return cache.entries.get(h); // get() must be nopark, or this is a compile error
+    sync(cache) {                    // the body may call only Never functions
+        return cache.entries.get(h); // get() is Never unless it is [yield] or parks
     }
 }
 
@@ -96,15 +165,34 @@ fn[nopark] broken(k: u8[]&) {
     sleep(1ms);                      // error: park source in a nopark function
                                      //   broken -> sleep (extern parks)
 }
+
+fn[nopark] spin(flag: Flag&) {
+    while !flag.isSet() { }          // warning (loops): unbounded loop in a nopark function
+}
+
+fn tight(cache: Ref<Cache>, r: Reader&) {
+    mutate(cache) {
+        scanForever(r);              // warning (always on in a lock body): scanForever loops unbounded
+    }                                //   tight -> scanForever
+}
 ```
 
-Inferred effects:
+A file that starts with the file-level default:
+
+```cpp
+[yield]                              // placeholder spelling: every function below defaults to [yield]
+fn render(page: Page&): string { for b in page.blocks { ... } }   // gets checks
+fn[noyield] crc(data: u8[]&): u32 { ... }                          // override: plain C
+```
+
+Inferred effects and summary fields:
 
 ```
-hash          Never                 (tagged; no checks)
-nextLine      Never                 (no loop, calls only Never functions)
-parseHeaders  May, yields=true      (checks only; cannot wait on I/O or a lock)
-lookup        May                   (acquiring the lock can park)
+hash          Never   loops=bounded   (no attribute, no checks)
+nextLine      Never   loops=none
+parseHeaders  May     yields=true  loops=long
+lookup        May     (acquiring the lock can park)
+spin          Never   loops=unbounded (nopark, warns)
 ```
 
 C for `parseHeaders`:
@@ -135,7 +223,6 @@ st_t parseHeaders_call(task_t *t, u8buf *buf, Headers *out) {
 - `hash` has no counter and no status, so the C compiler can inline it freely.
 - On the common path a check costs a decrement and a branch per iteration. Strip-mining would test once per block. Neither cost nor strip-mining is measured yet (B13).
 - If `buf` pointed at a native-stack local in the caller, the caller would need a frame-resident local, or the yield would leave a dangling borrow ([D2](open-decisions.md#d2-borrowed-locals-and-the-lazy-shape)).
-- Library functions used inside `sync`/`mutate` (here `entries.get`) must be `fn[nopark]`, so the standard library needs a deliberate tagging pass ([D13](open-decisions.md#d13-runaway-non-parking-code)).
 
 ## 2. Lowering to resumable frames
 
@@ -262,7 +349,7 @@ Case 2 is mechanical. Case 1 is not: `let buf = readBuffer(); conn.recv(buf&)` i
 
 ## 3. Calls that never suspend
 
-`Never` functions compile to ordinary C and are inlined by the C compiler under its usual rules. With budget checks on by default, a `Never` function is one that has no loop or recursion and calls only `Never` functions, or one tagged `nopark`. Parsing, rendering and hashing helpers that loop are `May` unless tagged, and the hot, bounded ones should be tagged. A `Cond(P)` function called with a known non-parking argument binds to its plain entry.
+`Never` functions compile to ordinary C and are inlined by the C compiler under its usual rules. Without `[yield]`, a loop adds no effect, so most helpers (parsing, rendering, hashing) are `Never`. A `Cond(P)` function called with a known non-parking argument binds to its plain entry.
 
 For a `May` function the non-suspending path should be straight-line C with one status test after each `May` call. The cost of that test is what the 0.7 to 1.5 ns above measures.
 
@@ -280,7 +367,7 @@ Cooperative, as in spec 6.2: the cancelling party marks the task and wakes it. A
 
 Cancellation is **not an ordinary exception**: it is not named in `throws`, and `catch` cannot swallow it. Letting `catch (Exception)` swallow it would make cancellation unreliable; requiring it in `throws` would put the effect back in signatures everywhere. This choice interacts with the open exception-model question (spec 10.7) and is stated here as Direction only.
 
-A task can be cancelled at any park point, including a budget check, so a task spinning in a checked loop is cancellable. A task inside a `nopark` function, a plain `extern fn` or an indivisible library operation is not, until it returns.
+A task can be cancelled at any park point, including a budget check, so a task spinning in a `[yield]` loop is cancellable. A task in a loop without `[yield]`, a `nopark` function, a plain `extern fn` or an indivisible library operation is not, until it returns.
 
 ### Deterministic cleanup
 
