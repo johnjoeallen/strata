@@ -1660,7 +1660,7 @@
 </tr>
 <tr>
 <td>Package</td>
-<td><code>package[yield] imaging</code>, in one file of the package</td>
+<td><code>package[yield] imaging</code>, repeated on the package line of every file in the folder</td>
 <td>every function in the package</td>
 </tr>
 <tr>
@@ -1671,7 +1671,7 @@
 </tbody>
 </table>
 <p>A CPU-heavy type marks itself once and tags its hot, bounded helpers <code>[noyield]</code>. A <code>[nopark]</code> type asserts that none of its methods can park; a method can still override it, and the override is then reported at the method. Files are not a level: a file is a layout accident.
-- <strong>Package.</strong> Every source file starts with <code>package name</code>; the files that share a name form one package, which compiles to one <code>.smod</code> named after it (placeholder syntax; the rules are in <a href="../open-decisions/#d14-packages-and-imports">D14</a>). The package default is written on the package declaration, <code>package[yield] imaging</code>, in exactly one file of the package (by convention <code>package.stra</code>); every other file writes a plain <code>package imaging</code>, and an attribute there is an error. Source files therefore carry no conflicting settings.
+- <strong>Package.</strong> Follows the Java folder convention. A package is a folder, its name is the folder path under the source root with dots for slashes (<code>stra/http/styles/cpp/</code> is <code>http.styles.cpp</code>), and every file in the folder starts with the same <code>package</code> line. There is no special file. A package default is written on that package line, <code>package[yield] imaging</code>; because the line is repeated in every file, the setting is visible wherever you read, and all files of a package must state the identical line (a file that differs or omits it is an error). The package compiles to one <code>.smod</code> named after it. Placeholder syntax; the rules are in <a href="../open-decisions/#d14-packages-and-imports">D14</a>.
 - <strong>Resolved at definition.</strong> The compiler resolves each function's effective attribute when it compiles the defining package, and the IR carries the resolved value. A generic instantiated in another package keeps the setting of the package that defined it; settings are never inherited by importers. The package default is part of the module's input hash: changing it recompiles the package and its effect changes ripple as usual.
 - <strong>Tooling must show the effective setting and its source</strong> (function, type or package) in hover, because it is no longer visible at the function itself. That is the cost of having levels.
 - <strong>Spelling.</strong> The attribute follows <code>fn</code> on a function and the name on a type, which differ; whether to unify them (<code>fn f[yield]</code>) is <strong>Open</strong>.
@@ -1753,7 +1753,8 @@
 <p><strong>Known limits.</strong> It will miss unbounded work inside loops that look bounded, flag some bounded loops it cannot prove bounded, and sees foreign and indirect calls only as stated.</p>
 <h3 id="example-attributes-sync-and-loop-warnings">Example: attributes, <code>sync</code> and loop warnings<a class="headerlink" href="#example-attributes-sync-and-loop-warnings" title="Permanent link">&para;</a></h3>
 <p>Illustrative Strata source and C. Neither is compiler output.</p>
-<div class="highlight"><pre><span></span><code><span class="n">package</span><span class="w"> </span><span class="n">http</span>
+<div class="highlight"><pre><span></span><code><span class="c1">// http/headers.stra</span>
+<span class="n">package</span><span class="w"> </span><span class="n">http</span>
 
 <span class="c1">// Opted in: the compiler inserts a budget check in this loop. May, yields only.</span>
 <span class="n">fn</span><span class="p">[</span><span class="n">yield</span><span class="p">]</span><span class="w"> </span><span class="n">parseHeaders</span><span class="p">(</span><span class="n">buf</span><span class="o">:</span><span class="w"> </span><span class="n">u8</span><span class="p">[]</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">Headers</span><span class="w"> </span><span class="k">throws</span><span class="w"> </span><span class="n">BadRequest</span><span class="w"> </span><span class="p">{</span>
@@ -1796,18 +1797,28 @@
 <span class="w">    </span><span class="p">}</span><span class="w">                                </span><span class="c1">//   tight -&gt; scanForever</span>
 <span class="p">}</span>
 </code></pre></div>
-<p>A type that opts in as a whole, and a package that sets the default for its files (<code>package.stra</code> is the one file that may carry package attributes):</p>
-<div class="highlight"><pre><span></span><code><span class="c1">// imaging/package.stra</span>
-<span class="n">package</span><span class="p">[</span><span class="n">noyield</span><span class="p">]</span><span class="w"> </span><span class="n">imaging</span><span class="w">         </span><span class="c1">// the package default; here it restates that nothing is inserted</span>
+<p>The three levels together. The folder is the package; each file repeats the package line:</p>
+<div class="highlight"><pre><span></span><code>imaging/
+    renderer.stra
+    metrics.stra
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1">// imaging/renderer.stra</span>
+<span class="n">package</span><span class="p">[</span><span class="n">yield</span><span class="p">]</span><span class="w"> </span><span class="n">imaging</span><span class="w">                    </span><span class="c1">// package default: functions here get budget checks</span>
 
-<span class="c1">// imaging/renderer.stra</span>
-<span class="n">package</span><span class="w"> </span><span class="n">imaging</span>
-
-<span class="k">struct</span><span class="w"> </span><span class="nc">Renderer</span><span class="p">[</span><span class="n">yield</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="n">fn</span><span class="w"> </span><span class="nf">render</span><span class="p">(</span><span class="n">page</span><span class="o">:</span><span class="w"> </span><span class="n">Page</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">string</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">blocks</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// gets checks: the type says [yield]</span>
-<span class="w">    </span><span class="n">fn</span><span class="p">[</span><span class="n">noyield</span><span class="p">]</span><span class="w"> </span><span class="n">crc</span><span class="p">(</span><span class="n">data</span><span class="o">:</span><span class="w"> </span><span class="n">u8</span><span class="p">[]</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">                          </span><span class="c1">// override: plain C</span>
-<span class="w">    </span><span class="n">fn</span><span class="p">[</span><span class="n">nopark</span><span class="p">]</span><span class="w"> </span><span class="n">width</span><span class="p">(</span><span class="n">c</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">128</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span><span class="w">          </span><span class="c1">// asserts it never parks</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Renderer</span><span class="w"> </span><span class="p">{</span><span class="w">                         </span><span class="c1">// no attribute: inherits [yield] from the package</span>
+<span class="w">    </span><span class="n">fn</span><span class="w"> </span><span class="nf">render</span><span class="p">(</span><span class="n">page</span><span class="o">:</span><span class="w"> </span><span class="n">Page</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">string</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">page</span><span class="p">.</span><span class="n">blocks</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// gets checks</span>
+<span class="w">    </span><span class="n">fn</span><span class="p">[</span><span class="n">noyield</span><span class="p">]</span><span class="w"> </span><span class="n">crc</span><span class="p">(</span><span class="n">data</span><span class="o">:</span><span class="w"> </span><span class="n">u8</span><span class="p">[]</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">                          </span><span class="c1">// the function overrides: plain C</span>
 <span class="p">}</span>
+
+<span class="c1">// imaging/metrics.stra</span>
+<span class="n">package</span><span class="p">[</span><span class="n">yield</span><span class="p">]</span><span class="w"> </span><span class="n">imaging</span><span class="w">                    </span><span class="c1">// the same line as in renderer.stra</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">Metrics</span><span class="p">[</span><span class="n">noyield</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w">                 </span><span class="c1">// the type overrides the package default</span>
+<span class="w">    </span><span class="n">fn</span><span class="w"> </span><span class="nf">width</span><span class="p">(</span><span class="n">c</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">128</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span><span class="w">                  </span><span class="c1">// no checks (the type says noyield)</span>
+<span class="w">    </span><span class="n">fn</span><span class="p">[</span><span class="n">yield</span><span class="p">]</span><span class="w"> </span><span class="n">widest</span><span class="p">(</span><span class="n">text</span><span class="o">:</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">text</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span><span class="w">    </span><span class="c1">// the function overrides the type</span>
+<span class="p">}</span>
+
+<span class="n">fn</span><span class="p">[</span><span class="n">nopark</span><span class="p">]</span><span class="w"> </span><span class="n">isAscii</span><span class="p">(</span><span class="n">c</span><span class="o">:</span><span class="w"> </span><span class="n">u32</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">128</span><span class="w"> </span><span class="p">}</span><span class="w">                   </span><span class="c1">// asserts it never parks</span>
 </code></pre></div>
 <p>Inferred effects and summary fields:</p>
 <div class="highlight"><pre><span></span><code>hash          Never   loops=bounded   (no attribute, no checks)
@@ -1929,13 +1940,15 @@ status = DONE | THROWN | PARKED
 <p>Frames come from a per-function arena, sized exactly. This matches the existing per-type arena rule and the <code>frames_bench</code> model; idle parked task cost there was 137 B with no state and 393 B at depth 4, against a 4 KB floor for a stackful fiber (Measured, hand-written).</p>
 <p><strong>Frames never move</strong> (Direction). A frame address is stable from creation to destruction. This removes the <code>Pin</code> problem Rust async has, and lets other code hold pointers into a frame.</p>
 <h3 id="pseudocode">Pseudocode<a class="headerlink" href="#pseudocode" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>package db                                  // compiled separately         Park(query) = May   (calls Conn.recv)
+<div class="highlight"><pre><span></span><code>// db/query.stra
+package db                                  // compiled separately         Park(query) = May   (calls Conn.recv)
 fn query(sql: string&amp;, id: i64): Row throws DbError {
     let c = pool.acquire();                 // May: waits for a free connection
     c.send(encode(sql, id));                // May
     return decode(c.recv());                // May
 }
 
+// app/handle.stra
 package app
 import db
 fn handle(req: Request&amp;): Response throws DbError {

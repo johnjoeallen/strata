@@ -1213,7 +1213,8 @@
 <p>Mutability, escape (retains/publishes), access mode per parameter, and <code>fresh</code> are Tier A contract data (<a href="../architecture/modules/#access-and-escape-summaries">modules</a>). Changing a field from write-once to mutable is a breaking change.</p>
 <h2 id="example-1-local-use-no-blocks">Example 1: local use, no blocks<a class="headerlink" href="#example-1-local-use-no-blocks" title="Permanent link">&para;</a></h2>
 <p>A test or a command-line tool builds a store and reads it back in one vthread. Nothing escapes, so there is nothing to lock.</p>
-<div class="highlight"><pre><span></span><code><span class="n">package</span><span class="w"> </span><span class="n">tools</span>
+<div class="highlight"><pre><span></span><code><span class="c1">// tools/load.stra</span>
+<span class="n">package</span><span class="w"> </span><span class="n">tools</span>
 
 <span class="n">fn</span><span class="w"> </span><span class="n">loadAndCount</span><span class="p">(</span><span class="n">path</span><span class="o">:</span><span class="w"> </span><span class="n">string</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">usize</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">let</span><span class="w"> </span><span class="n">store</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">Store</span><span class="w"> </span><span class="p">{}</span><span class="w">              </span><span class="c1">// local</span>
@@ -1225,7 +1226,8 @@
 </code></pre></div>
 <p>Under the earlier <code>SharedRef</code> idea this would have needed a different type or a separate shared variant. Here it is the same <code>Store</code> and the same code as the server uses.</p>
 <h2 id="example-2-what-db-needs-and-what-it-does-not">Example 2: what <code>Db</code> needs and what it does not<a class="headerlink" href="#example-2-what-db-needs-and-what-it-does-not" title="Permanent link">&para;</a></h2>
-<p><div class="highlight"><pre><span></span><code><span class="n">package</span><span class="w"> </span><span class="n">redis</span>
+<p><div class="highlight"><pre><span></span><code><span class="c1">// redis/db.stra</span>
+<span class="n">package</span><span class="w"> </span><span class="n">redis</span>
 
 <span class="k">struct</span><span class="w"> </span><span class="nc">Db</span><span class="w"> </span><span class="p">{</span><span class="w">                               </span><span class="c1">// every field is set in make() and never written again: write-once</span>
 <span class="w">    </span><span class="nl">store</span><span class="p">:</span><span class="w"> </span><span class="n">Ref</span><span class="o">&lt;</span><span class="n">Store</span><span class="o">&gt;</span>
@@ -1253,13 +1255,15 @@
 <li><code>Value</code> is "immutable once built". After <code>get</code> returns the <code>Ref&lt;Value&gt;</code> the caller reads <code>v.bytes</code> with no block, which is exactly what the comment in <code>db.stra</code> relies on when it writes the reply after the lock is released.</li>
 </ul>
 <h2 id="example-3-errors-the-compiler-reports">Example 3: errors the compiler reports<a class="headerlink" href="#example-3-errors-the-compiler-reports" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="n">package</span><span class="w"> </span><span class="n">redis</span>
+<div class="highlight"><pre><span></span><code><span class="c1">// redis/stats.stra</span>
+<span class="n">package</span><span class="w"> </span><span class="n">redis</span>
 
 <span class="n">fn</span><span class="w"> </span><span class="n">size</span><span class="p">(</span><span class="n">db</span><span class="o">:</span><span class="w"> </span><span class="n">Db</span><span class="o">&amp;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">usize</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">db</span><span class="p">.</span><span class="n">store</span><span class="p">.</span><span class="n">entries</span><span class="p">.</span><span class="n">count</span><span class="w">         </span><span class="c1">// error: store.entries is mutable and db is incoming</span>
 <span class="p">}</span><span class="w">                                         </span><span class="c1">//   fix: sync(db.store) { return db.store.entries.count }</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="n">package</span><span class="w"> </span><span class="n">redis</span>
+<div class="highlight"><pre><span></span><code><span class="c1">// redis/trim.stra</span>
+<span class="n">package</span><span class="w"> </span><span class="n">redis</span>
 
 <span class="n">fn</span><span class="w"> </span><span class="n">trim</span><span class="p">(</span><span class="n">store</span><span class="o">:</span><span class="w"> </span><span class="n">Ref</span><span class="o">&lt;</span><span class="n">Store</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">sync</span><span class="p">(</span><span class="n">store</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -1267,7 +1271,8 @@
 <span class="w">    </span><span class="p">}</span><span class="w">                                         </span><span class="c1">//   needs mutate(store), have sync(store)</span>
 <span class="p">}</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="n">package</span><span class="w"> </span><span class="n">redis</span>
+<div class="highlight"><pre><span></span><code><span class="c1">// redis/peek.stra</span>
+<span class="n">package</span><span class="w"> </span><span class="n">redis</span>
 
 <span class="n">fn</span><span class="w"> </span><span class="n">peekKeys</span><span class="p">(</span><span class="n">store</span><span class="o">:</span><span class="w"> </span><span class="n">Ref</span><span class="o">&lt;</span><span class="n">Store</span><span class="o">&gt;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">Bytes</span><span class="p">,</span><span class="w"> </span><span class="n">Entry</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">sync</span><span class="p">(</span><span class="n">store</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -1277,7 +1282,8 @@
 </code></pre></div>
 <p>The messages name the chain and the fix. A missing block on a reference that turns out never to be shared is still reported: that is the over-approximation in R2, and the cost is one extra block that does nothing at run time.</p>
 <h2 id="example-4-publishing-and-what-changes-after-it">Example 4: publishing, and what changes after it<a class="headerlink" href="#example-4-publishing-and-what-changes-after-it" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="n">package</span><span class="w"> </span><span class="n">redis</span>
+<div class="highlight"><pre><span></span><code><span class="c1">// redis/main.stra</span>
+<span class="n">package</span><span class="w"> </span><span class="n">redis</span>
 
 <span class="n">fn</span><span class="w"> </span><span class="n">main</span><span class="p">(</span><span class="n">args</span><span class="o">:</span><span class="w"> </span><span class="n">Args</span><span class="o">&amp;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">let</span><span class="w"> </span><span class="n">db</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Db</span><span class="p">.</span><span class="n">make</span><span class="p">(</span><span class="n">lim</span><span class="p">)</span><span class="w">                 </span><span class="c1">// fresh: local so far</span>
@@ -1289,7 +1295,8 @@
 </code></pre></div>
 <p>Before the <code>spawn</code>, <code>db</code> is local and could be inspected directly. After it, every access to mutable state follows R1. Moving the line above the <code>spawn</code> makes it legal, and correct, since no other vthread yet exists.</p>
 <h2 id="example-5-modes-across-a-call">Example 5: modes across a call<a class="headerlink" href="#example-5-modes-across-a-call" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="n">package</span><span class="w"> </span><span class="n">redis</span>
+<div class="highlight"><pre><span></span><code><span class="c1">// redis/expire.stra</span>
+<span class="n">package</span><span class="w"> </span><span class="n">redis</span>
 
 <span class="n">fn</span><span class="w"> </span><span class="n">expireAndCount</span><span class="p">(</span><span class="n">store</span><span class="o">:</span><span class="w"> </span><span class="n">Ref</span><span class="o">&lt;</span><span class="n">Store</span><span class="o">&gt;</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="n">usize</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">mutate</span><span class="p">(</span><span class="n">store</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>

@@ -1041,7 +1041,7 @@
 <td>Programmer never decides what is shared; a missing or too-weak block is a compile error; layout and behaviour do not depend on other modules. Cost of per-instance flag still to measure.</td>
 </tr>
 <tr>
-<td>Every source file declares <code>package name</code>; a package compiles to one <code>.smod</code>; imports name packages</td>
+<td>Java folder convention: a package is a folder, every file declares <code>package path.to.folder</code>, a package compiles to one <code>.smod</code>, imports name packages, and the package default attribute is repeated on the package line of every file (no special file)</td>
 <td>A unit for module compilation, visibility and the <code>[yield]</code>/<code>[noyield]</code>/<code>[nopark]</code> default. The details are open (D14).</td>
 </tr>
 <tr>

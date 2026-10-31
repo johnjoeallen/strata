@@ -1398,7 +1398,7 @@
 
 
 <h1 id="compiled-modules-and-application-linking">Compiled modules and application linking<a class="headerlink" href="#compiled-modules-and-application-linking" title="Permanent link">&para;</a></h1>
-<p>A <strong>compiled Strata module</strong> (working extension <code>.smod</code>; a bundle of them is an archive, <code>.sar</code>) is the compiled form of one source <em>package</em> (the files that declare the same <code>package name</code>, see <a href="../open-decisions/#d14-packages-and-imports">D14</a>); the module takes the package's name. It is what a library ships and what an application consumes. It carries enough to type-check, lifetime-check, effect-check and optimise a program against it <strong>without the original source</strong>. Names and extensions are placeholders.</p>
+<p>A <strong>compiled Strata module</strong> (working extension <code>.smod</code>; a bundle of them is an archive, <code>.sar</code>) is the compiled form of one source <em>package</em> (a folder of files that all start with the same <code>package name</code> line, see <a href="../open-decisions/#d14-packages-and-imports">D14</a>); the module takes the package's name. It is what a library ships and what an application consumes. It carries enough to type-check, lifetime-check, effect-check and optimise a program against it <strong>without the original source</strong>. Names and extensions are placeholders.</p>
 <h2 id="1-three-tiers-of-information">1. Three tiers of information<a class="headerlink" href="#1-three-tiers-of-information" title="Permanent link">&para;</a></h2>
 <p>The module separates what is needed for correctness from what only enables optimisation. A consumer can drop a higher tier and still get a correct program.</p>
 <table>
